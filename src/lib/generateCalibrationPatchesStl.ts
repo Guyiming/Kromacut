@@ -1,19 +1,19 @@
 /**
- * Generates a binary STL blob containing a row of flat square test patches,
- * one per layer count. Each patch is 20×20mm with height = layerCount × layerHeight.
- * Patches are arranged along the X axis with 5mm gaps.
+ * 生成包含一行平面方形测试色块的二进制 STL blob，
+ * 每个层数对应一个色块。每个色块为 20×20mm，高度 = layerCount × layerHeight。
+ * 色块沿 X 轴排列，间隔为 5mm。
  *
- * No Three.js dependency — writes binary STL directly.
+ * 不依赖 Three.js — 直接写入二进制 STL。
  */
 
-const PATCH_SIZE = 20; // mm
+const PATCH_SIZE = 20; // 毫米
 
-/** Write a float32 little-endian at byte offset */
+/** 在指定字节偏移处以小端方式写入 float32 */
 function setF32(view: DataView, offset: number, value: number) {
     view.setFloat32(offset, value, true);
 }
 
-/** Write one STL triangle (50 bytes) */
+/** 写入一个 STL 三角形（50 字节） */
 function writeTriangle(
     view: DataView,
     offset: number,
@@ -30,28 +30,28 @@ function writeTriangle(
 }
 
 /**
- * Write all 12 triangles for a box.
- * Corner at (x0, 0, z0), size (w, d, h). Z is the build direction.
+ * 写入一个长方体的全部 12 个三角形。
+ * 角点位于 (x0, 0, z0)，尺寸为 (w, d, h)。Z 为构建方向。
  */
 function writeBox(view: DataView, offset: number, x0: number, w: number, h: number, d: number, z0 = 0): number {
     const x1 = x0 + w, y1 = d, z1 = z0 + h;
 
-    // Bottom (Z=z0, normal -Z)
+    // 底面（Z=z0，法线 -Z）
     offset = writeFace(view, offset,  0,  0, -1,   x0,0,z0,  x1,y1,z0, x1,0,z0);
     offset = writeFace(view, offset,  0,  0, -1,   x0,0,z0,  x0,y1,z0, x1,y1,z0);
-    // Top (Z=z1, normal +Z)
+    // 顶面（Z=z1，法线 +Z）
     offset = writeFace(view, offset,  0,  0,  1,   x0,0,z1,  x1,0,z1,  x1,y1,z1);
     offset = writeFace(view, offset,  0,  0,  1,   x0,0,z1,  x1,y1,z1, x0,y1,z1);
-    // Front (Y=0, normal -Y)
+    // 前面（Y=0，法线 -Y）
     offset = writeFace(view, offset,  0, -1,  0,   x0,0,z0,  x1,0,z0,  x1,0,z1);
     offset = writeFace(view, offset,  0, -1,  0,   x0,0,z0,  x1,0,z1,  x0,0,z1);
-    // Back (Y=d, normal +Y)
+    // 后面（Y=d，法线 +Y）
     offset = writeFace(view, offset,  0,  1,  0,   x0,y1,z0, x1,y1,z1, x1,y1,z0);
     offset = writeFace(view, offset,  0,  1,  0,   x0,y1,z0, x0,y1,z1, x1,y1,z1);
-    // Left (X=x0, normal -X)
+    // 左面（X=x0，法线 -X）
     offset = writeFace(view, offset, -1,  0,  0,   x0,0,z0,  x0,0,z1,  x0,y1,z1);
     offset = writeFace(view, offset, -1,  0,  0,   x0,0,z0,  x0,y1,z1, x0,y1,z0);
-    // Right (X=x1, normal +X)
+    // 右面（X=x1，法线 +X）
     offset = writeFace(view, offset,  1,  0,  0,   x1,0,z0,  x1,y1,z0, x1,y1,z1);
     offset = writeFace(view, offset,  1,  0,  0,   x1,0,z0,  x1,y1,z1, x1,0,z1);
 

@@ -5,7 +5,7 @@ import { MINIMAL_PROJECT_SETTINGS, KROMACUT_CONFIG } from './slicerDefaults';
 export interface Export3MFOptions {
     layerHeight?: number;
     firstLayerHeight?: number;
-    layerFilamentColors?: string[]; // Optional per-layer filament colors (hex) for export
+    layerFilamentColors?: string[]; // 可选的每层耗材颜色（十六进制），用于导出
     onProgress?: (progress: number) => void;
 }
 
@@ -41,7 +41,7 @@ export async function exportObjectTo3MFBlob(
 </Relationships>`;
     zip.folder('_rels')?.file('.rels', rels);
 
-    // Collect meshes
+    // 收集网格
     const meshes: THREE.Mesh[] = [];
     root.updateMatrixWorld(true);
     root.traverse((obj) => {
@@ -55,8 +55,8 @@ export async function exportObjectTo3MFBlob(
 
     if (meshes.length === 0) throw new Error('No meshes to export');
 
-    // Collect materials (colors)
-    // We map hex string -> index in basematerials
+    // 收集材质（颜色）
+    // 我们将十六进制字符串映射到 basematerials 中的索引
     const colorMap = new Map<string, number>();
     const colors: string[] = [];
 
@@ -82,16 +82,16 @@ export async function exportObjectTo3MFBlob(
         return colorMap.get(hex)!;
     };
 
-    // Pre-calculate all materials so we can write the header correctly
+    // 预先计算所有材质，以便正确写入头部
     for (let i = 0; i < meshes.length; i++) {
         const overrideHex = options?.layerFilamentColors?.[i];
         getMaterialIndex(meshes[i].material, overrideHex);
     }
 
-    // Prepare Project Settings (Minimal)
+    // 准备项目设置（最小化）
     const projectSettings = { ...MINIMAL_PROJECT_SETTINGS };
 
-    // Apply user options
+    // 应用用户选项
     if (options?.layerHeight) {
         projectSettings.layer_height = options.layerHeight.toString();
     }
@@ -99,11 +99,11 @@ export async function exportObjectTo3MFBlob(
         projectSettings.initial_layer_print_height = options.firstLayerHeight.toString();
     }
 
-    // Apply Colors/Filaments
-    // Ensure we have at least one color if none found (fallback to white)
+    // 应用颜色 / 耗材
+    // 如果未找到颜色则确保至少有一种（回退到白色）
     const exportColors = colors.length > 0 ? colors : ['FFFFFF'];
 
-    // Helper to expand arrays to match color count
+    // 用于扩展数组以匹配颜色数量的辅助函数
     const expand = (val: string, count: number) => Array(count).fill(val);
 
     projectSettings.filament_colour = exportColors.map((c) => '#' + c);
@@ -117,10 +117,10 @@ export async function exportObjectTo3MFBlob(
 
     projectSettings.filament_vendor = expand('Generic', exportColors.length);
 
-    // Build object resources using a chunked writer to avoid OOM with massive arrays
+    // 使用分块写入器构建对象资源，以避免在处理大型数组时出现 OOM
     const xmlParts: string[] = [];
     let currentChunk = '';
-    // Reduced chunk size to 10MB to be safer with string concatenation limits and memory pressure
+    // 将块大小减小到 10MB，以更安全地处理字符串拼接限制和内存压力
     const CHUNK_SIZE = 10 * 1024 * 1024;
 
     const write = (str: string) => {
@@ -131,25 +131,25 @@ export async function exportObjectTo3MFBlob(
         }
     };
 
-    // IDs: 1 = BaseMaterials, 2..N = Objects
+    // ID：1 = BaseMaterials，2..N = Objects
     const baseMatId = 1;
     let nextId = 2;
 
-    // Helper to format float - Optimized to avoid string allocations (toFixed/replace)
+    // 浮点数格式化辅助函数 — 优化以避免字符串分配（toFixed/replace）
     const f = (n: number) => {
-        // Round to 5 decimal places
+        // 四舍五入到 5 位小数
         return (Math.round(n * 100000) / 100000).toString();
     };
 
-    // Vector helper
+    // 向量辅助变量
     const v = new THREE.Vector3();
 
-    // Store IDs of generated mesh objects to group them later
+    // 存储已生成的网格对象的 ID，以便稍后将它们分组
     const componentIds: number[] = [];
-    // Store metadata for model_settings.config
+    // 为 model_settings.config 存储元数据
     const componentMeta: { id: number; name: string; colorIdx: number }[] = [];
 
-    // Header and BaseMaterials
+    // 头部和 BaseMaterials
     let header = `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:slic3rpe="http://schemas.slic3r.org/3mf/2017/06" xmlns:BambuStudio="http://schemas.bambulab.com/package/2021" xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06" requiredextensions="p">
  <metadata name="BambuStudio:3mfVersion">1</metadata>
@@ -166,7 +166,7 @@ export async function exportObjectTo3MFBlob(
     header += ` <resources>
 `;
 
-    // Write Base Materials if we have any
+    // 如果有颜色则写入基础材质
     if (colors.length > 0) {
         header += `  <basematerials id="${baseMatId}">
 `;
@@ -180,14 +180,14 @@ export async function exportObjectTo3MFBlob(
 
     write(header);
 
-    // Yield every N vertices/triangles to allow GC and UI updates
+    // 每 N 个顶点/三角形让出执行权，以便进行 GC 和 UI 更新
     const YIELD_EVERY = 5000;
     let opsSinceYield = 0;
 
-    // Progress tracking
+    // 进度跟踪
     const onProgress = options?.onProgress;
     const totalMeshes = meshes.length;
-    // Each mesh has two phases: vertices (~40%) and triangles (~40%), zip is last ~20%
+    // 每个网格有两个阶段：顶点（约 40%）和三角形（约 40%），zip 是最后约 20%
     const reportMeshProgress = (
         meshIdx: number,
         phase: 'vertices' | 'triangles',
@@ -197,7 +197,7 @@ export async function exportObjectTo3MFBlob(
         const meshFrac =
             (meshIdx + (phase === 'vertices' ? phaseFrac * 0.5 : 0.5 + phaseFrac * 0.5)) /
             totalMeshes;
-        // Mesh processing is ~80% of total, zip generation is ~20%
+        // 网格处理约占总进度的 80%，zip 生成约占 20%
         onProgress(meshFrac * 0.8);
     };
 
@@ -216,7 +216,7 @@ export async function exportObjectTo3MFBlob(
         ) {
             hex = (mesh.material as THREE.MeshStandardMaterial).color.getHexString().toUpperCase();
         }
-        // Use 1-based index for color/extruder
+        // 颜色/挤出机使用从 1 开始的索引
         componentMeta.push({
             id: objectId,
             name: `Layer ${i + 1} (#${hex})`,
@@ -286,7 +286,7 @@ export async function exportObjectTo3MFBlob(
 `);
     }
 
-    // Assembly Object
+    // 装配对象
     const assemblyId = nextId++;
     const assemblyUuid = generateUUID();
     write(`<object id="${assemblyId}" p:UUID="${assemblyUuid}" type="model" name="Kromacut Model">
@@ -313,7 +313,7 @@ export async function exportObjectTo3MFBlob(
 `);
     write(`</model>`);
 
-    // Flush remaining chunk
+    // 刷新剩余的块
     if (currentChunk.length > 0) {
         xmlParts.push(currentChunk);
     }
@@ -322,10 +322,10 @@ export async function exportObjectTo3MFBlob(
 
     zip.folder('3D')?.file('3dmodel.model', finalBlob);
 
-    // Generate Metadata/model_settings.config
-    // This is required for Bambu Studio / Orca Slicer / Creality Print to correctly identify
-    // the multipart object structure and assign names/settings, avoiding the "profile selection" prompt
-    // and enabling correct color assignment visualization.
+    // 生成 Metadata/model_settings.config
+    // 这是 Bambu Studio / Orca Slicer / Creality Print 正确识别多部件对象结构、
+    // 分配名称/设置所必需的，可避免"配置文件选择"提示，
+    // 并启用正确的颜色分配可视化。
     let modelSettings = `<?xml version="1.0" encoding="UTF-8"?>
 <config>
  <object id="${assemblyId}">
@@ -373,7 +373,7 @@ export async function exportObjectTo3MFBlob(
         { type: 'blob' },
         onProgress
             ? (meta) => {
-                  // zip progress goes from 80% to 100%
+                  // zip 进度从 80% 到 100%
                   onProgress(0.8 + (meta.percent / 100) * 0.2);
               }
             : undefined

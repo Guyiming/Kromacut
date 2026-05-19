@@ -7,7 +7,7 @@ const LAST_PALETTE_KEY = 'kromacut.palettes.lastId';
 const SELECTED_PALETTE_KEY = 'kromacut.palettes.selected';
 
 /* ---------------------------------------------------------------------------
- * localStorage helpers
+ * localStorage 辅助函数
  * --------------------------------------------------------------------------- */
 
 export function loadCustomPalettes(): CustomPalette[] {
@@ -28,7 +28,7 @@ export function saveCustomPalettes(palettes: CustomPalette[]) {
     try {
         localStorage.setItem(PALETTES_STORAGE_KEY, JSON.stringify(palettes));
     } catch {
-        // ignore storage errors
+        // 忽略存储错误
     }
 }
 
@@ -48,7 +48,7 @@ export function saveLastCustomPaletteId(id: string | null) {
             localStorage.removeItem(LAST_PALETTE_KEY);
         }
     } catch {
-        // ignore
+        // 忽略
     }
 }
 
@@ -64,7 +64,7 @@ export function saveSelectedPalette(id: string) {
     try {
         localStorage.setItem(SELECTED_PALETTE_KEY, id);
     } catch {
-        // ignore
+        // 忽略
     }
 }
 
@@ -106,16 +106,16 @@ export function deleteCustomPalette(palettes: CustomPalette[], id: string): Cust
 }
 
 /* ---------------------------------------------------------------------------
- * Import / export
+ * 导入 / 导出
  * --------------------------------------------------------------------------- */
 
-/** Check if two color arrays are identical (order-sensitive). */
+/** 检查两个颜色数组是否相同（顺序敏感）。 */
 function colorsEqual(a: string[], b: string[]): boolean {
     if (a.length !== b.length) return false;
     return a.every((c, i) => c.toLowerCase() === b[i].toLowerCase());
 }
 
-/** Derive a unique name by appending a numeric suffix if it already exists. */
+/** 如果名称已存在，则通过追加数字后缀派生唯一名称。 */
 function deduplicateName(name: string, existing: CustomPalette[]): string {
     const names = new Set(existing.map((p) => p.name));
     if (!names.has(name)) return name;
@@ -133,10 +133,10 @@ export interface ImportPaletteResult {
 }
 
 /**
- * Import palettes with duplicate prevention:
- * - ID match: overwrite
- * - Content match (same colors): skip
- * - Name match (different content): rename with numeric suffix
+ * 导入调色板，并防止重复：
+ * - ID 匹配：覆盖
+ * - 内容匹配（颜色相同）：跳过
+ * - 名称匹配（内容不同）：使用数字后缀重命名
  */
 export function importCustomPalettes(
     existing: CustomPalette[],
@@ -165,7 +165,7 @@ export function importCustomPalettes(
             updatedAt: now,
         };
 
-        // 1. ID match → overwrite
+        // 1. ID 匹配 → 覆盖
         const idMatch = result.palettes.findIndex((p) => p.id === palette.id);
         if (idMatch !== -1) {
             result.palettes[idMatch] = { ...palette, updatedAt: now };
@@ -174,14 +174,14 @@ export function importCustomPalettes(
             continue;
         }
 
-        // 2. Content match (same colors) → skip
+        // 2. 内容匹配（颜色相同）→ 跳过
         const contentMatch = result.palettes.find((p) => colorsEqual(p.colors, validColors));
         if (contentMatch) {
             result.skipped.push(`${palette.name} (matches "${contentMatch.name}")`);
             continue;
         }
 
-        // 3. Name match → rename
+        // 3. 名称匹配 → 重命名
         const nameMatch = result.palettes.some((p) => p.name === palette.name);
         if (nameMatch) {
             palette.name = deduplicateName(palette.name, result.palettes);
@@ -196,8 +196,8 @@ export function importCustomPalettes(
 }
 
 /**
- * Parse a JSON string into an array of custom palettes.
- * Accepts a single palette object or an array.
+ * 将 JSON 字符串解析为自定义调色板数组。
+ * 接受单个调色板对象或数组。
  */
 export function parseCustomPaletteFile(json: string): CustomPalette[] | null {
     try {
@@ -212,14 +212,14 @@ export function parseCustomPaletteFile(json: string): CustomPalette[] | null {
     }
 }
 
-/** Build an export blob for a custom palette. */
+/** 为自定义调色板构建导出 blob。 */
 export function exportCustomPaletteBlob(palette: CustomPalette): Blob {
     return new Blob([JSON.stringify(palette, null, 2)], {
         type: 'application/json',
     });
 }
 
-/** Sanitize a name for use as a filename. */
+/** 清理名称以便用作文件名。 */
 export function customPaletteFileName(name: string): string {
     return `${name.replace(/[^a-zA-Z0-9_-]/g, '_')}.kpal`;
 }

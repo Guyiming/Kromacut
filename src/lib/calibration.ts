@@ -1,60 +1,60 @@
 import { estimateTDFromColor } from './colorUtils';
 
 /**
- * Filament Calibration System
+ * 耗材校准系统
  *
- * Implements TD (Transmission Distance) calibration workflow where users measure
- * light transmission through stacked filament layers to derive accurate TD values.
+ * 实现透射距离 (TD) 校准工作流，用户通过测量穿过堆叠耗材层的光透射，
+ * 推导出准确的 TD 值。
  *
- * Calibration process:
- * 1. User prints test patches at different layer counts (e.g., 2, 4, 6, 8, 10 layers)
- * 2. User photographs patches on backlit surface and samples RGB values
- * 3. Algorithm fits Beer-Lambert curve to derive TD for each color channel
- * 4. Confidence score computed based on fit quality and measurement consistency
+ * 校准过程：
+ * 1. 用户打印不同层数的测试色块（例如 2、4、6、8、10 层）
+ * 2. 用户在背光表面拍摄色块并采样 RGB 值
+ * 3. 算法拟合比尔-朗伯定律曲线以推导每个颜色通道的 TD
+ * 4. 基于拟合质量和测量一致性计算置信度分数
  */
 
 // ============================================================================
-// Type Definitions
+// 类型定义
 // ============================================================================
 
 /**
- * Single measurement point: layer count and measured transmission
+ * 单个测量点：层数和测得的透射率
  */
 export type CalibrationRgb = [number, number, number];
 
 export interface CalibrationMeasurement {
-    layers: number; // Number of layers printed
-    rgb: CalibrationRgb; // Measured RGB value (0-255)
-    transmission: CalibrationRgb; // Normalized transmission (0-1)
+    layers: number; // 打印的层数
+    rgb: CalibrationRgb; // 测得的 RGB 值 (0-255)
+    transmission: CalibrationRgb; // 归一化的透射率 (0-1)
 }
 
 /**
- * Complete calibration result for a filament
+ * 耗材的完整校准结果
  */
 export interface CalibrationResult {
-    color: string; // Hex color
+    color: string; // 十六进制颜色
     measurements: CalibrationMeasurement[];
-    whiteReference?: CalibrationRgb; // Measured backlight RGB used to normalize transmission
-    td: CalibrationRgb; // Fitted TD for R, G, B channels (mm)
-    tdSingleValue: number; // Auto-paint working TD derived from the measured samples (mm)
-    confidence: number; // 0-1 score based on fit quality
-    calibrationDate: string; // ISO timestamp
-    notes?: string; // Optional user notes
+    whiteReference?: CalibrationRgb; // 测得的背光 RGB，用于归一化透射率
+    td: CalibrationRgb; // 拟合得到的 R、G、B 通道 TD（毫米）
+    tdSingleValue: number; // 由测量样本推导出的自动上色工作 TD（毫米）
+    confidence: number; // 0-1 分数，基于拟合质量
+    calibrationDate: string; // ISO 时间戳
+    notes?: string; // 可选的用户备注
 }
 
 /**
- * Calibration wizard state
+ * 校准向导状态
  */
 export interface CalibrationState {
     filamentColor: string;
     measurements: CalibrationMeasurement[];
     whiteReference: CalibrationRgb;
     currentStep: 'intro' | 'print' | 'measure' | 'results';
-    layerHeight: number; // mm per layer
+    layerHeight: number; // 每层的毫米数
 }
 
 // ============================================================================
-// Constants
+// 常量
 // ============================================================================
 
 export const RECOMMENDED_LAYER_COUNTS = [2, 4, 6, 8, 10];
@@ -266,19 +266,19 @@ function fitWorkingTdFromMeasurements(
 }
 
 // ============================================================================
-// Core Calibration Algorithm
+// 核心校准算法
 // ============================================================================
 
 /**
- * Calculate TD from calibration measurements using Beer-Lambert law.
+ * 使用比尔-朗伯定律从校准测量值计算 TD。
  *
- * Beer-Lambert: T = 10^(-d/TD)
- * Where T = transmission, d = distance (layers × layer_height), TD = transmission distance
+ * 比尔-朗伯定律：T = 10^(-d/TD)
+ * 其中 T = 透射率，d = 距离（层数 × 层高），TD = 透射距离
  *
- * Solving for TD: TD = -d / log10(T)
+ * 求解 TD：TD = -d / log10(T)
  *
- * For each channel, we compute TD from each measurement pair, then
- * use weighted least-squares to fit a robust average.
+ * 对于每个通道，我们从每对测量值中计算 TD，
+ * 然后使用加权最小二乘法拟合一个稳健的平均值。
  */
 export function calculateTDFromMeasurements(
     measurements: CalibrationMeasurement[],
@@ -292,11 +292,11 @@ export function calculateTDFromMeasurements(
         );
     }
 
-    // Sort measurements by layer count
+    // 按层数对测量值排序
     const normalizedMeasurements = normalizeCalibrationMeasurements(measurements, whiteReference);
     const sorted = normalizedMeasurements.sort((a, b) => a.layers - b.layers);
 
-    // Compute TD for each channel independently
+    // 独立计算每个通道的 TD
     const tdChannels: [number, number, number] = [0, 0, 0];
     const confidences: [number, number, number] = [0, 0, 0];
 
@@ -314,71 +314,71 @@ export function calculateTDFromMeasurements(
     );
     const tdSingleValue = workingFit.td;
 
-    // Overall confidence combines the per-channel fit stability with the
-    // working-TD fit quality used by auto-paint.
+    // 整体置信度结合了每通道拟合的稳定性
+    // 与自动上色使用的工作 TD 拟合质量。
     const confidence = (Math.min(...confidences) + workingFit.confidence) / 2;
 
     return { td: tdChannels, tdSingleValue, confidence };
 }
 
 /**
- * Fit TD for a single color channel using weighted least-squares
+ * 使用加权最小二乘法为单个颜色通道拟合 TD
  */
 function fitTDForChannel(
     measurements: CalibrationMeasurement[],
     channel: number,
     layerHeight: number
 ): { td: number; confidence: number } {
-    // Compute TD from each measurement
+    // 从每个测量值计算 TD
     const tdEstimates: Array<{ td: number; thickness: number; transmission: number }> = [];
 
     for (const measurement of measurements) {
         const transmission = measurement.transmission[channel];
-        if (transmission <= 0 || transmission >= 1) continue; // Skip invalid measurements
+        if (transmission <= 0 || transmission >= 1) continue; // 跳过无效测量
 
         const thickness = measurement.layers * layerHeight;
         const td = -thickness / Math.log10(transmission);
 
         if (td > 0 && td < 100) {
-            // Sanity check: TD should be 0.5-20mm typically
+            // 合理性检查：TD 通常应在 0.5-20mm 之间
             tdEstimates.push({ td, thickness, transmission });
         }
     }
 
     if (tdEstimates.length === 0) {
-        // Fallback: return default TD with low confidence
+        // 回退：返回默认 TD 和较低的置信度
         return { td: 2.0, confidence: 0.1 };
     }
 
-    // Weighted average: measurements with moderate transmission (0.2-0.8) get higher weight
+    // 加权平均：透射率适中 (0.2-0.8) 的测量值获得更高的权重
     let weightedSum = 0;
     let totalWeight = 0;
 
     for (const { td, transmission } of tdEstimates) {
-        // Weight function: peaks at T=0.5, drops off at extremes
-        const weight = 1 - Math.abs(transmission - 0.5) * 2; // 0 at T=0 or T=1, 1 at T=0.5
+        // 权重函数：在 T=0.5 处达到峰值，在两端下降
+        const weight = 1 - Math.abs(transmission - 0.5) * 2; // T=0 或 T=1 时为 0，T=0.5 时为 1
         weightedSum += td * weight;
         totalWeight += weight;
     }
 
     const tdFitted = weightedSum / totalWeight;
 
-    // Calculate confidence based on consistency of estimates
+    // 基于估计值的一致性计算置信度
     const variance =
         tdEstimates.reduce((sum, { td }) => sum + Math.pow(td - tdFitted, 2), 0) /
         tdEstimates.length;
     const stdDev = Math.sqrt(variance);
     const coefficientOfVariation = stdDev / tdFitted;
 
-    // Confidence: 1.0 if CV < 0.1, decreases linearly to 0.5 at CV = 0.4
+    // 置信度：CV < 0.1 时为 1.0，CV = 0.4 时线性降至 0.5
     const confidence = Math.max(0.5, 1.0 - coefficientOfVariation * 2.5);
 
     return { td: tdFitted, confidence };
 }
 
 /**
- * Convert measured RGB values to normalized transmission values.
- * Uses a measured white reference so camera and backlight tint are normalized out.
+ * 将测得的 RGB 值转换为归一化的透射率值。
+ * 使用测得的白色参考来归一化相机和背光的色调。
  */
 export function rgbToTransmission(
     rgb: CalibrationRgb,
@@ -393,8 +393,8 @@ export function rgbToTransmission(
 }
 
 /**
- * Estimate expected RGB for a given layer count based on current TD estimate.
- * Useful for showing preview during calibration.
+ * 基于当前 TD 估计值，预测给定层数的预期 RGB。
+ * 在校准过程中显示预览时很有用。
  */
 export function predictTransmission(
     filamentColor: string,
@@ -405,11 +405,11 @@ export function predictTransmission(
 ): CalibrationRgb {
     const thickness = layers * layerHeight;
 
-    // Parse filament color
+    // 解析耗材颜色
     const rgb = hexToRgb(filamentColor);
     if (!rgb) return [128, 128, 128];
 
-    // Beer-Lambert: T = 10^(-d/TD)
+    // 比尔-朗伯定律：T = 10^(-d/TD)
     const transmission: [number, number, number] = [
         Math.pow(10, -thickness / td[0]),
         Math.pow(10, -thickness / td[1]),
@@ -418,7 +418,7 @@ export function predictTransmission(
 
     const reference = sanitizeWhiteReference(whiteReference);
 
-    // Tint the measured white-reference backlight by filament color
+    // 用耗材颜色为测得的白色参考背光着色
     return [
         Math.round(transmission[0] * (rgb[0] / 255) * reference[0]),
         Math.round(transmission[1] * (rgb[1] / 255) * reference[1]),
@@ -427,41 +427,41 @@ export function predictTransmission(
 }
 
 // ============================================================================
-// Confidence Scoring
+// 置信度评分
 // ============================================================================
 
 /**
- * Compute confidence score for a filament profile.
- * Takes into account:
- * - Whether calibration data exists
- * - Quality of calibration fit
- * - Age of calibration
- * - Number of measurements
+ * 计算耗材配置文件的置信度分数。
+ * 考虑因素：
+ * - 是否存在校准数据
+ * - 校准拟合的质量
+ * - 校准的时长
+ * - 测量的次数
  */
 export function computeProfileConfidence(profile: {
     calibration?: CalibrationResult;
     transmissionDistance: number;
 }): number {
     if (!profile.calibration) {
-        // No calibration data: base confidence on TD value
-        // Lower TD = more typical for lithophanes = higher confidence
+        // 无校准数据：基于 TD 值确定置信度
+        // TD 越低 = 越适合光刻图 = 置信度越高
         const td = profile.transmissionDistance;
-        if (td >= 1.0 && td <= 5.0) return 0.5; // Reasonable estimate
-        if (td >= 0.5 && td <= 10.0) return 0.3; // Plausible but uncertain
-        return 0.1; // Likely a guess
+        if (td >= 1.0 && td <= 5.0) return 0.5; // 合理的估计
+        if (td >= 0.5 && td <= 10.0) return 0.3; // 可能但不确定
+        return 0.1; // 可能是猜测
     }
 
     const cal = profile.calibration;
     let confidence = cal.confidence;
 
-    // Penalize old calibrations (>6 months)
+    // 惩罚旧的校准（>6 个月）
     const ageMs = Date.now() - new Date(cal.calibrationDate).getTime();
     const ageMonths = ageMs / (1000 * 60 * 60 * 24 * 30);
     if (ageMonths > 6) {
-        confidence *= Math.max(0.7, 1 - (ageMonths - 6) / 24); // Decay over 2 years
+        confidence *= Math.max(0.7, 1 - (ageMonths - 6) / 24); // 在 2 年内衰减
     }
 
-    // Bonus for more measurements
+    // 测量次数越多奖励越多
     const measurementBonus = Math.min(0.1, cal.measurements.length * 0.02);
     confidence = Math.min(1.0, confidence + measurementBonus);
 
@@ -469,7 +469,7 @@ export function computeProfileConfidence(profile: {
 }
 
 /**
- * Get confidence label for UI display
+ * 获取用于 UI 显示的置信度标签
  */
 export function getConfidenceLabel(confidence: number): string {
     if (confidence >= CONFIDENCE_THRESHOLD_EXCELLENT) return 'Excellent';
@@ -479,7 +479,7 @@ export function getConfidenceLabel(confidence: number): string {
 }
 
 /**
- * Get confidence color for UI display (Tailwind classes)
+ * 获取用于 UI 显示的置信度颜色（Tailwind 类）
  */
 export function getConfidenceColor(confidence: number): string {
     if (confidence >= CONFIDENCE_THRESHOLD_EXCELLENT) return 'text-green-600';
@@ -489,11 +489,11 @@ export function getConfidenceColor(confidence: number): string {
 }
 
 // ============================================================================
-// Validation Helpers
+// 验证辅助函数
 // ============================================================================
 
 /**
- * Validate a calibration measurement
+ * 验证一个校准测量
  */
 export function validateMeasurement(
     measurement: CalibrationMeasurement,
@@ -517,7 +517,7 @@ export function validateMeasurement(
 }
 
 /**
- * Check if measurements are ready for TD calculation
+ * 检查测量值是否已准备好用于 TD 计算
  */
 export function canCalculateTD(
     measurements: CalibrationMeasurement[],
@@ -538,13 +538,13 @@ export function canCalculateTD(
         };
     }
 
-    // Check for duplicate layer counts
+    // 检查是否有重复的层数
     const layerCounts = new Set(measurements.map((m) => m.layers));
     if (layerCounts.size < measurements.length) {
         return { ready: false, reason: 'Duplicate layer counts detected' };
     }
 
-    // Validate each measurement
+    // 验证每个测量
     for (const measurement of measurements) {
         const validation = validateMeasurement(measurement, whiteReference);
         if (!validation.valid) {
@@ -556,7 +556,7 @@ export function canCalculateTD(
 }
 
 /**
- * Get recommended layer counts that haven't been measured yet
+ * 获取尚未测量的推荐层数
  */
 export function getRecommendedLayerCounts(
     existing: CalibrationMeasurement[]
@@ -567,11 +567,11 @@ export function getRecommendedLayerCounts(
 }
 
 // ============================================================================
-// Utility Functions
+// 工具函数
 // ============================================================================
 
 /**
- * Parse hex color to RGB
+ * 将十六进制颜色解析为 RGB
  */
 function hexToRgb(hex: string): [number, number, number] | null {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -581,7 +581,7 @@ function hexToRgb(hex: string): [number, number, number] | null {
 }
 
 /**
- * Generate calibration instructions for user
+ * 为用户生成校准说明
  */
 export function getCalibrationInstructions(layerHeight: number): string[] {
     return [
@@ -597,19 +597,19 @@ export function getCalibrationInstructions(layerHeight: number): string[] {
 }
 
 /**
- * Export calibration result to JSON for sharing
+ * 将校准结果导出为 JSON 以便分享
  */
 export function exportCalibration(result: CalibrationResult): string {
     return JSON.stringify(result, null, 2);
 }
 
 /**
- * Import calibration result from JSON
+ * 从 JSON 导入校准结果
  */
 export function importCalibration(json: string): CalibrationResult {
     const parsed = JSON.parse(json);
 
-    // Validation
+    // 验证
     if (
         typeof parsed.color !== 'string' ||
         !Array.isArray(parsed.measurements) ||

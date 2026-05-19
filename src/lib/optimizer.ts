@@ -1,78 +1,78 @@
 /**
- * Advanced Filament Order Optimizer
+ * 高级耗材顺序优化器
  *
- * Implements sophisticated optimization algorithms to find the best filament ordering
- * for multi-material lithophanes. Supports:
- * - Simulated Annealing: Probabilistic global optimization with temperature scheduling
- * - Genetic Algorithm: Population-based evolutionary optimization
- * - Region Weighting: Prioritize important image areas (faces, focal points)
- * - Deterministic Seeding: Reproducible results for A/B testing
- * - Result Caching: Skip redundant computations
+ * 实现一系列复杂的优化算法，用于为多材料光刻画寻找最佳耗材排序。
+ * 支持：
+ * - 模拟退火（Simulated Annealing）：带温度调度的概率性全局优化
+ * - 遗传算法（Genetic Algorithm）：基于种群的进化式优化
+ * - 区域权重（Region Weighting）：优先考虑图像中的重要区域（如人脸、焦点）
+ * - 确定性种子（Deterministic Seeding）：用于 A/B 测试的可复现结果
+ * - 结果缓存（Result Caching）：跳过冗余计算
  */
 
 import type { Filament } from '@/types';
 import { rgbToLab, deltaELab, hexToRgb, blendColors, type RGB, type Lab } from './autoPaint';
 
 // ============================================================================
-// Type Definitions
+// 类型定义
 // ============================================================================
 
 export interface OptimizerOptions {
     algorithm: 'exhaustive' | 'simulated-annealing' | 'genetic' | 'auto';
-    seed?: number; // For deterministic results
-    maxIterations?: number; // Algorithm-specific iteration limit
-    temperature?: number; // Initial temperature for SA
-    coolingRate?: number; // Temperature decay for SA
-    populationSize?: number; // Population size for GA
-    mutationRate?: number; // Mutation probability for GA
-    eliteCount?: number; // Number of elite individuals to preserve in GA
-    regionWeights?: Float32Array; // Per-pixel importance weights (0-1)
-    cachingEnabled?: boolean; // Enable result caching
+    seed?: number; // 用于确定性结果
+    maxIterations?: number; // 算法相关的迭代次数上限
+    temperature?: number; // 模拟退火的初始温度
+    coolingRate?: number; // 模拟退火的温度衰减率
+    populationSize?: number; // 遗传算法的种群规模
+    mutationRate?: number; // 遗传算法的变异概率
+    eliteCount?: number; // 遗传算法中保留的精英个体数量
+    regionWeights?: Float32Array; // 每像素重要性权重（0-1）
+    cachingEnabled?: boolean; // 启用结果缓存
 }
 
 export interface OptimizerResult {
-    order: Filament[]; // Best filament ordering found
-    score: number; // Quality score (lower is better, deltaE-based)
-    iterations: number; // Iterations performed
-    converged: boolean; // Whether algorithm converged
-    cacheHit?: boolean; // Whether result came from cache
-    resolvedAlgorithm?: string; // Actual algorithm used (after 'auto' resolution)
+    order: Filament[]; // 找到的最佳耗材排序
+    score: number; // 质量分数（越低越好，基于 deltaE）
+    iterations: number; // 已执行的迭代次数
+    converged: boolean; // 算法是否已收敛
+    cacheHit?: boolean; // 结果是否来自缓存
+    resolvedAlgorithm?: string; // 实际使用的算法（'auto' 解析后的结果）
 }
 
 export interface ScoringContext {
-    imageColors: Array<Lab & { weight: number }>; // Weighted Lab colors from image
+    imageColors: Array<Lab & { weight: number }>; // 来自图像的带权 Lab 颜色
     layerHeight: number;
     firstLayerHeight: number;
-    regionWeights?: Float32Array; // Per-pixel importance
+    regionWeights?: Float32Array; // 每像素重要性
 }
 
 // ============================================================================
-// Deterministic Random Number Generator
+// 确定性随机数生成器
 // ============================================================================
 
 /**
- * LCG (Linear Congruential Generator) for deterministic random numbers.
- * Uses parameters from Numerical Recipes (a=1664525, c=1013904223, m=2^32).
+ * LCG（线性同余生成器），用于生成确定性的随机数。
+ * 使用《Numerical Recipes》中的参数（a=1664525, c=1013904223, m=2^32）。
  */
 class SeededRandom {
     private state: number;
 
     constructor(seed: number = Date.now()) {
-        this.state = seed >>> 0; // Ensure unsigned 32-bit
+        this.state = seed >>> 0; // 确保为无符号 32 位
     }
 
-    /** Generate random float in [0, 1) */
+    /** 生成 [0, 1) 范围内的随机浮点数 */
     next(): number {
         this.state = (this.state * 1664525 + 1013904223) >>> 0;
         return this.state / 0x100000000;
     }
 
-    /** Generate random integer in [min, max) */
+    /** 生成 [min, max) 范围内的随机整数 */
     nextInt(min: number, max: number): number {
         return Math.floor(this.next() * (max - min)) + min;
     }
 
-    /** Shuffle array in-place using Fisher-Yates */
+    /** 使用 Fisher-Yates 算法对数组进行原地洗牌 */
     shuffle<T>(array: T[]): T[] {
         const arr = [...array];
         for (let i = arr.length - 1; i > 0; i--) {
@@ -84,7 +84,7 @@ class SeededRandom {
 }
 
 // ============================================================================
-// Result Caching
+// 结果缓存
 // ============================================================================
 
 class OptimizerCache {
@@ -97,14 +97,14 @@ class OptimizerCache {
         algorithm?: string,
         seed?: number
     ): string {
-        // Create stable key from filaments and context
+        // 根据耗材和上下文创建稳定的键
         const filamentKey = filaments
             .map((f) => `${f.color}:${f.td.toFixed(2)}`)
             .sort()
             .join('|');
 
         const imageKey = context.imageColors
-            .slice(0, 20) // Sample first 20 colors for hash
+            .slice(0, 20) // 抽取前 20 个颜色用于哈希
             .map((c) => `${c.L.toFixed(1)},${c.a.toFixed(1)},${c.b.toFixed(1)}`)
             .join('|');
 
@@ -128,7 +128,7 @@ class OptimizerCache {
     ): void {
         const key = this.getCacheKey(filaments, context, algorithm, seed);
 
-        // Evict oldest if at capacity
+        // 容量已满时驱逐最旧的项
         if (this.cache.size >= this.maxSize) {
             const firstKey = this.cache.keys().next().value;
             if (firstKey) this.cache.delete(firstKey);
@@ -149,14 +149,14 @@ class OptimizerCache {
 const globalCache = new OptimizerCache();
 
 // ============================================================================
-// Scoring Functions
+// 评分函数
 // ============================================================================
 
 /**
- * Calculate quality score for a filament ordering.
- * Lower score = better color reproduction.
+ * 计算耗材排序的质量分数。
+ * 分数越低 = 颜色还原效果越好。
  *
- * Score is weighted deltaE between image colors and achievable blended colors.
+ * 分数为图像颜色与可达成混合颜色之间的加权 deltaE。
  */
 function scoreFilamentOrder(
     filaments: Filament[],
@@ -167,12 +167,12 @@ function scoreFilamentOrder(
     let totalError = 0;
     let totalWeight = 0;
 
-    // For each image color, find the best achievable match using this filament stack
+    // 对每个图像颜色，使用此耗材堆栈寻找最佳可达成的匹配
     for (const targetColor of context.imageColors) {
         const achievableColor = findBestAchievableColor(targetColor, filaments, context);
         const error = deltaELab(targetColor, achievableColor);
 
-        // Apply region weight if provided
+        // 如有提供则应用区域权重
         totalError += error * targetColor.weight;
         totalWeight += targetColor.weight;
     }
@@ -181,8 +181,8 @@ function scoreFilamentOrder(
 }
 
 /**
- * Find the best color achievable by stacking filaments to a certain height.
- * Uses Beer-Lambert simulation to predict the blended color at various heights.
+ * 查找将耗材堆叠到某一高度时可达成的最佳颜色。
+ * 使用 Beer-Lambert 模拟来预测不同高度下的混合颜色。
  */
 function findBestAchievableColor(
     targetLab: Lab,
@@ -194,8 +194,8 @@ function findBestAchievableColor(
         return rgbToLab(hexToRgb(filaments[0].color));
     }
 
-    // Sample heights from base to full stack
-    const maxHeight = filaments.reduce((sum, f) => sum + f.td * 3, 0); // ~3x TD per filament
+    // 从底部到完整堆栈采样高度
+    const maxHeight = filaments.reduce((sum, f) => sum + f.td * 3, 0); // 每种耗材约 3 倍 TD
     const steps = 20;
     let bestLab = rgbToLab(hexToRgb(filaments[0].color));
     let bestDelta = deltaELab(targetLab, bestLab);
@@ -216,7 +216,7 @@ function findBestAchievableColor(
 }
 
 /**
- * Simulate the blended color of stacked filaments at a given height.
+ * 在给定高度模拟堆叠耗材的混合颜色。
  */
 function simulateStackAtHeight(
     filaments: Filament[],
@@ -244,7 +244,7 @@ function simulateStackAtHeight(
 }
 
 // ============================================================================
-// Exhaustive Search (Optimal but slow for >8 filaments)
+// 穷举搜索（最优解，但耗材数 > 8 时较慢）
 // ============================================================================
 
 function optimizeExhaustive(
@@ -273,7 +273,7 @@ function optimizeExhaustive(
     let bestScore = scoreFilamentOrder(filaments, context);
     let iterations = 0;
 
-    // Generate all permutations
+    // 生成所有排列
     const permute = (arr: Filament[], start = 0): void => {
         if (start === arr.length - 1) {
             iterations++;
@@ -303,14 +303,14 @@ function optimizeExhaustive(
 }
 
 // ============================================================================
-// Simulated Annealing (Good balance of quality and speed)
+// 模拟退火（在质量与速度之间取得良好平衡）
 // ============================================================================
 
 /**
- * Simulated Annealing optimizer with geometric cooling schedule.
+ * 使用几何冷却调度的模拟退火优化器。
  *
- * SA is a probabilistic technique that can escape local minima by accepting
- * worse solutions with probability exp(-ΔE/T), where T decreases over time.
+ * 模拟退火是一种概率性技术，能够通过以概率 exp(-ΔE/T) 接受较差解（其中
+ * T 随时间下降）来逃离局部最小值。
  */
 function optimizeSimulatedAnnealing(
     filaments: Filament[],
@@ -337,7 +337,7 @@ function optimizeSimulatedAnnealing(
     while (iterations < maxIterations && temperature > minTemp) {
         iterations++;
 
-        // Generate neighbor by swapping two random filaments
+        // 通过交换两个随机耗材生成邻居
         const newOrder = [...currentOrder];
         const i = rng.nextInt(0, newOrder.length);
         const j = rng.nextInt(0, newOrder.length);
@@ -346,7 +346,7 @@ function optimizeSimulatedAnnealing(
         const newScore = scoreFilamentOrder(newOrder, context);
         const deltaE = newScore - currentScore;
 
-        // Accept if better, or with probability exp(-ΔE/T) if worse
+        // 如果更优则接受，否则以 exp(-ΔE/T) 的概率接受
         const acceptProbability = deltaE < 0 ? 1.0 : Math.exp(-deltaE / temperature);
 
         if (rng.next() < acceptProbability) {
@@ -362,7 +362,7 @@ function optimizeSimulatedAnnealing(
         temperature *= coolingRate;
     }
 
-    // Convergence check: did we stabilize?
+    // 收敛检查：是否已稳定？
     const converged = temperature <= minTemp || iterations >= maxIterations;
 
     return {
@@ -374,14 +374,13 @@ function optimizeSimulatedAnnealing(
 }
 
 // ============================================================================
-// Genetic Algorithm (Great for large search spaces)
+// 遗传算法（适用于大规模搜索空间）
 // ============================================================================
 
 /**
- * Genetic Algorithm optimizer with elitism and tournament selection.
+ * 带精英保留和锦标赛选择的遗传算法优化器。
  *
- * Maintains a population of candidate solutions, evolves them through
- * selection, crossover, and mutation.
+ * 维护一个候选解种群，通过选择、交叉和变异使其进化。
  */
 function optimizeGenetic(
     filaments: Filament[],
@@ -398,7 +397,7 @@ function optimizeGenetic(
     const mutationRate = options.mutationRate ?? 0.1;
     const eliteCount = options.eliteCount ?? Math.max(2, Math.floor(populationSize * 0.1));
 
-    // Initialize population with random orderings
+    // 使用随机排序初始化种群
     let population: Array<{ order: Filament[]; score: number }> = [];
     for (let i = 0; i < populationSize; i++) {
         const order = rng.shuffle(filaments);
@@ -414,10 +413,10 @@ function optimizeGenetic(
     while (generations < maxGenerations && stagnantGenerations < maxStagnant) {
         generations++;
 
-        // Sort by score (lower is better)
+        // 按分数排序（越低越好）
         population.sort((a, b) => a.score - b.score);
 
-        // Check for improvement
+        // 检查是否有改进
         if (population[0].score < bestEver.score) {
             bestEver = { order: [...population[0].order], score: population[0].score };
             stagnantGenerations = 0;
@@ -425,22 +424,22 @@ function optimizeGenetic(
             stagnantGenerations++;
         }
 
-        // Elitism: preserve best individuals
+        // 精英保留：保留最优个体
         const nextGeneration = population.slice(0, eliteCount).map((ind) => ({
             order: [...ind.order],
             score: ind.score,
         }));
 
-        // Generate offspring
+        // 生成后代
         while (nextGeneration.length < populationSize) {
-            // Tournament selection: pick 3 random, choose best
+            // 锦标赛选择：随机选 3 个，挑选最优者
             const parent1 = tournamentSelect(population, 3, rng);
             const parent2 = tournamentSelect(population, 3, rng);
 
-            // Order crossover (OX)
+            // 顺序交叉（OX）
             let child = orderCrossover(parent1.order, parent2.order, rng);
 
-            // Mutation: swap two positions with probability
+            // 变异：以一定概率交换两个位置
             if (rng.next() < mutationRate) {
                 const i = rng.nextInt(0, child.length);
                 const j = rng.nextInt(0, child.length);
@@ -463,7 +462,7 @@ function optimizeGenetic(
 }
 
 /**
- * Tournament selection: pick k random individuals, return best one
+ * 锦标赛选择：随机选取 k 个个体，返回其中最优者
  */
 function tournamentSelect(
     population: Array<{ order: Filament[]; score: number }>,
@@ -483,7 +482,7 @@ function tournamentSelect(
 }
 
 /**
- * Order crossover (OX): preserves relative order from both parents
+ * 顺序交叉（OX）：保留来自双亲的相对顺序
  */
 function orderCrossover(
     parent1: Filament[],
@@ -494,13 +493,13 @@ function orderCrossover(
     const start = rng.nextInt(0, length);
     const end = rng.nextInt(start + 1, length + 1);
 
-    // Copy segment from parent1
+    // 从 parent1 复制片段
     const child: (Filament | null)[] = new Array(length).fill(null);
     for (let i = start; i < end; i++) {
         child[i] = parent1[i];
     }
 
-    // Fill remaining from parent2, preserving order
+    // 从 parent2 填充其余部分，保留顺序
     const remaining = parent2.filter((f) => !child.includes(f));
     let remainingIdx = 0;
 
@@ -514,23 +513,23 @@ function orderCrossover(
 }
 
 // ============================================================================
-// Main Optimizer Interface
+// 主优化器接口
 // ============================================================================
 
 /**
- * Optimize filament ordering using specified algorithm.
+ * 使用指定算法优化耗材排序。
  *
- * @param filaments - Filaments to order
- * @param context - Scoring context (image colors, layer heights)
- * @param options - Optimizer configuration
- * @returns Best ordering found with quality score
+ * @param filaments - 待排序的耗材
+ * @param context - 评分上下文（图像颜色、层高）
+ * @param options - 优化器配置
+ * @returns 找到的最佳排序及其质量分数
  */
 export function optimizeFilamentOrder(
     filaments: Filament[],
     context: ScoringContext,
     options: Partial<OptimizerOptions> = {}
 ): OptimizerResult {
-    // Determine if user provided explicit seed (for caching purposes)
+    // 判断用户是否提供了显式种子（用于缓存目的）
     const hasExplicitSeed = options.seed !== undefined;
 
     const opts: OptimizerOptions = {
@@ -540,7 +539,7 @@ export function optimizeFilamentOrder(
         ...options,
     };
 
-    // Auto-select algorithm based on problem size (before cache check)
+    // 根据问题规模自动选择算法（在缓存检查之前）
     let algorithm = opts.algorithm;
     if (algorithm === 'auto') {
         if (filaments.length <= 6) {
@@ -552,7 +551,7 @@ export function optimizeFilamentOrder(
         }
     }
 
-    // Only check cache if user provided explicit seed (random seeds should not be cached)
+    // 仅当用户提供了显式种子时才检查缓存（随机种子不应被缓存）
     if (opts.cachingEnabled && hasExplicitSeed) {
         const cached = globalCache.get(filaments, context, algorithm, opts.seed);
         if (cached) {
@@ -576,10 +575,10 @@ export function optimizeFilamentOrder(
             throw new Error(`Unknown algorithm: ${algorithm}`);
     }
 
-    // Tag the result with the resolved algorithm
+    // 用解析后的算法标记结果
     result.resolvedAlgorithm = algorithm;
 
-    // Only cache if user provided explicit seed (don't cache random results)
+    // 仅当用户提供了显式种子时才缓存（不缓存随机结果）
     if (opts.cachingEnabled && hasExplicitSeed) {
         globalCache.set(filaments, context, result, algorithm, opts.seed);
     }
@@ -588,14 +587,14 @@ export function optimizeFilamentOrder(
 }
 
 /**
- * Clear the optimizer cache
+ * 清空优化器缓存
  */
 export function clearOptimizerCache(): void {
     globalCache.clear();
 }
 
 /**
- * Get optimizer cache statistics
+ * 获取优化器缓存的统计信息
  */
 export function getOptimizerCacheStats(): { size: number; maxSize: number } {
     return {

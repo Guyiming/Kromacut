@@ -6,7 +6,7 @@ export interface MeshData {
 }
 
 // ============================================================================
-// Smooth Contour Meshing
+// 平滑轮廓网格化
 // ============================================================================
 
 const SMOOTH_SIMPLIFY_EPSILON = 0.75;
@@ -246,7 +246,7 @@ function traceComponentLoops(
 
     const visitedEdges = new Uint8Array(edges.length);
     const loops: Vector2[][] = [];
-    const turnPriority = [3, 0, 1, 2]; // left, straight, right, then back
+    const turnPriority = [3, 0, 1, 2]; // 左转、直行、右转，最后回头
 
     const selectNextEdge = (edge: BoundaryEdge): BoundaryEdge | undefined => {
         const outgoing = edgesByStart.get(edge.end);
@@ -321,8 +321,8 @@ function addExtrudedLoopWalls(
 }
 
 /**
- * Generates a smooth mesh by extracting exact voxel boundaries and rounding convex corners.
- * This preserves topology while producing cleaner diagonal edges than raw voxel extrusions.
+ * 通过提取精确的体素边界并对凸角进行圆滑处理，生成平滑网格。
+ * 该方法在保持拓扑结构的同时，比原始体素挤出生成的对角边更干净。
  */
 export async function generateSmoothMesh(
     activePixels: Uint8Array | Uint8ClampedArray | boolean[],
@@ -503,22 +503,22 @@ interface MeshYieldOptions {
 }
 
 /**
- * Generates an optimized 3D mesh for a layer of voxel-like pixels using Maximal Rectangle Greedy Meshing.
- * This approach minimizes the triangle count by merging active regions into large rectangles.
+ * 使用最大矩形贪心网格化算法为体素状像素层生成优化的 3D 网格。
+ * 该方法通过将活动区域合并成大矩形来最小化三角形数量。
  *
- * T-Junction Prevention: Walls are generated in a separate global pass to ensure all wall
- * vertices align properly, preventing non-manifold edges that cause slicer artifacts.
+ * T 形接缝预防：墙体在单独的全局阶段中生成，以确保所有墙体顶点正确对齐，
+ * 防止产生非流形边，从而避免切片器伪影。
  *
- * Coordinate system: X+ right, Y+ down (image coords), Z+ up
- * All faces use CCW winding when viewed from outside (right-hand rule for outward normals)
+ * 坐标系：X+ 向右，Y+ 向下（图像坐标），Z+ 向上
+ * 当从外部观察时，所有面均使用 CCW（逆时针）绕序（外法线右手定则）
  *
- * @param activePixels Row-major array where >0 indicates presence of a pixel
- * @param width Width of the pixel grid
- * @param height Height of the pixel grid
- * @param thickness Thickness of the layer (Z height)
- * @param zOffset Base Z height of the layer
- * @param pixelSize XY scaling factor (usually mm per pixel)
- * @param heightScale Z scaling factor
+ * @param activePixels 行优先数组，> 0 表示该位置存在像素
+ * @param width 像素网格的宽度
+ * @param height 像素网格的高度
+ * @param thickness 层的厚度（Z 方向高度）
+ * @param zOffset 层的基础 Z 高度
+ * @param pixelSize XY 缩放因子（通常为每像素的毫米数）
+ * @param heightScale Z 方向缩放因子
  */
 export async function generateGreedyMesh(
     activePixels: Uint8Array | Uint8ClampedArray | boolean[],
@@ -550,7 +550,7 @@ export async function generateGreedyMesh(
         }
     };
 
-    // Vertex welding maps: key = y * (width + 1) + x
+    // 顶点焊接表：键 = y * (width + 1) + x
     const topMap = new Map<number, number>();
     const bottomMap = new Map<number, number>();
     const stride = width + 1;
@@ -560,7 +560,7 @@ export async function generateGreedyMesh(
     const zBottom = scaledZOffset;
     const zTop = scaledZOffset + scaledThickness;
 
-    // --- Helper: Vertex Welding ---
+    // --- 辅助函数：顶点焊接 ---
     const getOrAddVertex = (x: number, y: number, isTop: boolean): number => {
         const key = y * stride + x;
         const map = isTop ? topMap : bottomMap;
@@ -573,14 +573,14 @@ export async function generateGreedyMesh(
         return idx;
     };
 
-    // Add a quad with CCW winding (v0 -> v1 -> v2 -> v3 should be CCW when viewed from outside)
+    // 添加一个 CCW 绕序的四边形（从外部看时 v0 -> v1 -> v2 -> v3 应为 CCW）
     const addQuadCCW = (v0: number, v1: number, v2: number, v3: number) => {
-        // Two triangles: (v0, v1, v2) and (v0, v2, v3)
+        // 两个三角形：(v0, v1, v2) 和 (v0, v2, v3)
         indices.push(v0, v1, v2);
         indices.push(v0, v2, v3);
     };
 
-    // --- Collect all greedy rectangles first ---
+    // --- 首先收集所有贪心矩形 ---
     interface Rect {
         x: number;
         y: number;
@@ -594,7 +594,7 @@ export async function generateGreedyMesh(
         for (let x = 0; x < width; x++) {
             const idx = y * width + x;
             if (activePixels[idx] && !visited[idx]) {
-                // 1. Find max width
+                // 1. 寻找最大宽度
                 let w = 1;
                 while (
                     x + w < width &&
@@ -604,7 +604,7 @@ export async function generateGreedyMesh(
                     w++;
                 }
 
-                // 2. Find max height for this width
+                // 2. 在该宽度下寻找最大高度
                 let h = 1;
                 let canExpand = true;
                 while (y + h < height && canExpand) {
@@ -618,7 +618,7 @@ export async function generateGreedyMesh(
                     if (canExpand) h++;
                 }
 
-                // 3. Mark visited
+                // 3. 标记为已访问
                 for (let dy = 0; dy < h; dy++) {
                     const rowOff = (y + dy) * width;
                     for (let dx = 0; dx < w; dx++) {
@@ -632,28 +632,28 @@ export async function generateGreedyMesh(
         await maybeYield();
     }
 
-    // --- Build global vertex requirement sets for walls ---
-    // These track all x-coordinates needed at each y for horizontal edges
-    // and all y-coordinates needed at each x for vertical edges
-    // This ensures walls are subdivided at T-junction points
+    // --- 为墙体构建全局顶点需求集合 ---
+    // 这些集合追踪每个 y 上水平边所需的所有 x 坐标，
+    // 以及每个 x 上垂直边所需的所有 y 坐标
+    // 这确保了墙体能在 T 形接缝点处被细分
 
-    // For north/south walls: verticesAtY[y] = Set of x-coordinates where vertices exist
+    // 用于北/南墙：verticesAtY[y] = 该 y 上存在顶点的 x 坐标集合
     const verticesAtY = new Map<number, Set<number>>();
-    // For west/east walls: verticesAtX[x] = Set of y-coordinates where vertices exist
+    // 用于西/东墙：verticesAtX[x] = 该 x 上存在顶点的 y 坐标集合
     const verticesAtX = new Map<number, Set<number>>();
 
-    // First pass: collect all rectangle corner vertices
+    // 第一遍：收集所有矩形的角点顶点
     for (const rect of rectangles) {
         const { x, y, w, h } = rect;
 
-        // Add vertices at all four corners for each y-coordinate
+        // 在每个 y 坐标上为四个角添加顶点
         for (const yCoord of [y, y + h]) {
             if (!verticesAtY.has(yCoord)) verticesAtY.set(yCoord, new Set());
             verticesAtY.get(yCoord)!.add(x);
             verticesAtY.get(yCoord)!.add(x + w);
         }
 
-        // Add vertices at all four corners for each x-coordinate
+        // 在每个 x 坐标上为四个角添加顶点
         for (const xCoord of [x, x + w]) {
             if (!verticesAtX.has(xCoord)) verticesAtX.set(xCoord, new Set());
             verticesAtX.get(xCoord)!.add(y);
@@ -663,9 +663,9 @@ export async function generateGreedyMesh(
         await maybeYield();
     }
 
-    // --- Generate Top and Bottom Faces for each rectangle ---
-    
-    // Pre-sort vertices for fast range queries
+    // --- 为每个矩形生成顶面和底面 ---
+
+    // 预先排序顶点以加快范围查询
     const sortedVerticesAtY = new Map<number, number[]>();
     for (const [y, set] of verticesAtY) {
         sortedVerticesAtY.set(y, Array.from(set).sort((a, b) => a - b));
@@ -718,19 +718,19 @@ export async function generateGreedyMesh(
 
         const boundary: Array<[number, number]> = [];
 
-        // Top edge: x -> x+w (exclude last point)
+        // 顶边：x -> x+w （不含最后一点）
         for (let i = topLo; i < topHi - 1; i++) {
             boundary.push([topLine[i], y]);
         }
-        // Right edge: y -> y+h (exclude last point)
+        // 右边：y -> y+h （不含最后一点）
         for (let i = rightLo; i < rightHi - 1; i++) {
             boundary.push([x + w, rightLine[i]]);
         }
-        // Bottom edge: x+w -> x (exclude last point)
+        // 底边：x+w -> x （不含最后一点）
         for (let i = bottomHi - 1; i > bottomLo; i--) {
             boundary.push([bottomLine[i], y + h]);
         }
-        // Left edge: y+h -> y (exclude last point)
+        // 左边：y+h -> y （不含最后一点）
         for (let i = leftHi - 1; i > leftLo; i--) {
             boundary.push([x, leftLine[i]]);
         }
@@ -745,15 +745,15 @@ export async function generateGreedyMesh(
             bottomLoop[i] = getOrAddVertex(vx, vy, false);
         }
 
-        // Triangulate (Fan from first vertex) - Shape is convex
-        // Top Face (Normal +Z, CCW)
+        // 三角化（从第一个顶点扇形展开） - 形状为凸
+        // 顶面（法线 +Z，CCW）
         const t0 = topLoop[0];
         for (let i = 1; i < topLoop.length - 1; i++) {
             indices.push(t0, topLoop[i], topLoop[i + 1]);
         }
 
-        // Bottom Face (Normal -Z, need CW winding viewed from outside)
-        // We use the same CCW loop but push indices as (v0, v2, v1)
+        // 底面（法线 -Z，从外部观察需要 CW 绕序）
+        // 我们使用相同的 CCW 循环，但以 (v0, v2, v1) 的形式压入索引
         const b0 = bottomLoop[0];
         for (let i = 1; i < bottomLoop.length - 1; i++) {
             indices.push(b0, bottomLoop[i + 1], bottomLoop[i]);
@@ -762,44 +762,44 @@ export async function generateGreedyMesh(
         await maybeYield();
     }
 
-    // --- Global Wall Generation ---
-    // Collect all wall segments at pixel granularity, then merge respecting all vertices
+    // --- 全局墙体生成 ---
+    // 以像素粒度收集所有墙体段，然后在合并时考虑所有顶点
 
-    // North walls (facing -Y): edges at y where pixel[y] is active but pixel[y-1] is not
-    // Map: y -> sorted list of x-coordinates needing north walls
+    // 北墙（朝向 -Y）：在 pixel[y] 为活动而 pixel[y-1] 不活动的 y 处
+    // Map: y -> 该处需要北墙的 x 坐标排序列表
     const northWalls = new Map<number, number[]>();
-    // South walls (facing +Y): edges at y where pixel[y-1] is active but pixel[y] is not
+    // 南墙（朝向 +Y）：在 pixel[y-1] 为活动而 pixel[y] 不活动的 y 处
     const southWalls = new Map<number, number[]>();
-    // West walls (facing -X): edges at x where pixel[x] is active but pixel[x-1] is not
+    // 西墙（朝向 -X）：在 pixel[x] 为活动而 pixel[x-1] 不活动的 x 处
     const westWalls = new Map<number, number[]>();
-    // East walls (facing +X): edges at x where pixel[x-1] is active but pixel[x] is not
+    // 东墙（朝向 +X）：在 pixel[x-1] 为活动而 pixel[x] 不活动的 x 处
     const eastWalls = new Map<number, number[]>();
 
-    // Scan for all wall edges
+    // 扫描所有墙体边
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             if (!activePixels[y * width + x]) continue;
 
-            // North wall needed if no neighbor above
+            // 上方无邻居时需要北墙
             if (y === 0 || !activePixels[(y - 1) * width + x]) {
                 if (!northWalls.has(y)) northWalls.set(y, []);
                 northWalls.get(y)!.push(x);
             }
 
-            // South wall needed if no neighbor below
+            // 下方无邻居时需要南墙
             if (y === height - 1 || !activePixels[(y + 1) * width + x]) {
                 const wallY = y + 1;
                 if (!southWalls.has(wallY)) southWalls.set(wallY, []);
                 southWalls.get(wallY)!.push(x);
             }
 
-            // West wall needed if no neighbor to the left
+            // 左方无邻居时需要西墙
             if (x === 0 || !activePixels[y * width + (x - 1)]) {
                 if (!westWalls.has(x)) westWalls.set(x, []);
                 westWalls.get(x)!.push(y);
             }
 
-            // East wall needed if no neighbor to the right
+            // 右方无邻居时需要东墙
             if (x === width - 1 || !activePixels[y * width + (x + 1)]) {
                 const wallX = x + 1;
                 if (!eastWalls.has(wallX)) eastWalls.set(wallX, []);
@@ -810,7 +810,7 @@ export async function generateGreedyMesh(
         await maybeYield();
     }
 
-    // Helper: merge wall segments respecting vertex positions
+    // 辅助函数：合并墙体段，同时考虑顶点位置
     const mergeAndEmitHorizontalWalls = (
         wallMap: Map<number, number[]>,
         yCoord: number,
@@ -821,7 +821,7 @@ export async function generateGreedyMesh(
 
         xCoords.sort((a, b) => a - b);
 
-        // Get all x-coordinates where we must have vertices at this y
+        // 获取该 y 上必须存在顶点的所有 x 坐标
         const requiredVertices = verticesAtY.get(yCoord) || new Set<number>();
 
         let runStart = xCoords[0];
@@ -833,16 +833,16 @@ export async function generateGreedyMesh(
             const mustSplit = requiredVertices.has(runEnd) && isContiguous;
 
             if (!isContiguous || mustSplit || i === xCoords.length) {
-                // Emit wall segment from runStart to runEnd
+                // 输出从 runStart 到 runEnd 的墙体段
                 if (isSouth) {
-                    // South wall (facing +Y)
+                    // 南墙（朝向 +Y）
                     const wTL = getOrAddVertex(runStart, yCoord, true);
                     const wTR = getOrAddVertex(runEnd, yCoord, true);
                     const wBR = getOrAddVertex(runEnd, yCoord, false);
                     const wBL = getOrAddVertex(runStart, yCoord, false);
                     addQuadCCW(wBL, wTL, wTR, wBR);
                 } else {
-                    // North wall (facing -Y)
+                    // 北墙（朝向 -Y）
                     const wTL = getOrAddVertex(runStart, yCoord, true);
                     const wTR = getOrAddVertex(runEnd, yCoord, true);
                     const wBR = getOrAddVertex(runEnd, yCoord, false);
@@ -851,7 +851,7 @@ export async function generateGreedyMesh(
                 }
 
                 if (mustSplit && isContiguous) {
-                    // Continue from the split point
+                    // 从分割点继续
                     runStart = runEnd;
                     runEnd = runStart + 1;
                 } else if (i < xCoords.length) {
@@ -874,7 +874,7 @@ export async function generateGreedyMesh(
 
         yCoords.sort((a, b) => a - b);
 
-        // Get all y-coordinates where we must have vertices at this x
+        // 获取该 x 上必须存在顶点的所有 y 坐标
         const requiredVertices = verticesAtX.get(xCoord) || new Set<number>();
 
         let runStart = yCoords[0];
@@ -886,16 +886,16 @@ export async function generateGreedyMesh(
             const mustSplit = requiredVertices.has(runEnd) && isContiguous;
 
             if (!isContiguous || mustSplit || i === yCoords.length) {
-                // Emit wall segment from runStart to runEnd
+                // 输出从 runStart 到 runEnd 的墙体段
                 if (isEast) {
-                    // East wall (facing +X)
+                    // 东墙（朝向 +X）
                     const wTL = getOrAddVertex(xCoord, runStart, true);
                     const wTR = getOrAddVertex(xCoord, runEnd, true);
                     const wBR = getOrAddVertex(xCoord, runEnd, false);
                     const wBL = getOrAddVertex(xCoord, runStart, false);
                     addQuadCCW(wBR, wTR, wTL, wBL);
                 } else {
-                    // West wall (facing -X)
+                    // 西墙（朝向 -X）
                     const wTL = getOrAddVertex(xCoord, runStart, true);
                     const wTR = getOrAddVertex(xCoord, runEnd, true);
                     const wBR = getOrAddVertex(xCoord, runEnd, false);
@@ -904,7 +904,7 @@ export async function generateGreedyMesh(
                 }
 
                 if (mustSplit && isContiguous) {
-                    // Continue from the split point
+                    // 从分割点继续
                     runStart = runEnd;
                     runEnd = runStart + 1;
                 } else if (i < yCoords.length) {
@@ -917,7 +917,7 @@ export async function generateGreedyMesh(
         }
     };
 
-    // Emit all walls
+    // 输出所有墙体
     for (const [y] of northWalls) {
         mergeAndEmitHorizontalWalls(northWalls, y, false);
         await maybeYield();

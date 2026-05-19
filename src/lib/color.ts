@@ -4,7 +4,7 @@ export interface HSL {
     l: number;
 }
 
-// Convert RGB (0-255) to HSL (h in degrees)
+// 将 RGB（0-255）转换为 HSL（h 单位为度）
 export function rgbToHsl(r: number, g: number, b: number): HSL {
     r /= 255;
     g /= 255;

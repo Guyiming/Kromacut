@@ -1,13 +1,13 @@
-// Binary STL exporter for three.js objects (Kromacut)
-// Exports the object's geometry (respecting world transforms) into a binary STL Blob.
-// Merges all Mesh descendants into a single STL file.
+// Three.js 对象的二进制 STL 导出器（Kromacut）
+// 将对象的几何体（考虑世界变换）导出为二进制 STL Blob。
+// 将所有 Mesh 后代合并到单个 STL 文件中。
 import * as THREE from 'three';
 
 export async function exportObjectToStlBlob(
     root: THREE.Object3D,
     onProgress?: (p: number) => void
 ): Promise<Blob> {
-    // 1. Collect all meshes
+    // 1. 收集所有网格
     const meshes: THREE.Mesh[] = [];
     root.updateMatrixWorld(true);
     root.traverse((obj) => {
@@ -21,7 +21,7 @@ export async function exportObjectToStlBlob(
 
     if (meshes.length === 0) throw new Error('No meshes found to export');
 
-    // 2. Calculate total size
+    // 2. 计算总大小
     let totalTris = 0;
     for (const mesh of meshes) {
         const geom = mesh.geometry;
@@ -46,11 +46,11 @@ export async function exportObjectToStlBlob(
     for (let i = 0; i < headerStr.length && i < 80; i++) view.setUint8(i, headerStr.charCodeAt(i));
     view.setUint32(headerBytes, totalTris, true);
 
-    const CHUNK = 5000; // Process in chunks to yield to UI
+    const CHUNK = 5000; // 分块处理以让出 UI
     let offset = headerBytes + 4;
     let processedTris = 0;
 
-    // Helper vector for transforming
+    // 用于变换的辅助向量
     const vA = new THREE.Vector3();
     const vB = new THREE.Vector3();
     const vC = new THREE.Vector3();
@@ -58,20 +58,20 @@ export async function exportObjectToStlBlob(
     const vAB = new THREE.Vector3();
     const vAC = new THREE.Vector3();
 
-    // 3. Write triangles
+    // 3. 写入三角形
     for (const mesh of meshes) {
         const geom = mesh.geometry;
         const pos = geom.getAttribute('position');
         const index = geom.getIndex();
         const matrix = mesh.matrixWorld;
 
-        // Ensure normals for lighting if needed, though STL usually ignores them or expects computed face normals
-        // We compute face normals on the fly below for the STL file
+        // 如果需要光照则确保有法线，但 STL 通常会忽略它们或使用计算出的面法线
+        // 我们在下面为 STL 文件即时计算面法线
 
         const count = index ? index.count : pos.count;
 
         for (let i = 0; i < count; i += 3) {
-            // Get indices
+            // 获取索引
             let a, b, c;
             if (index) {
                 a = index.getX(i);
@@ -83,17 +83,17 @@ export async function exportObjectToStlBlob(
                 c = i + 2;
             }
 
-            // Get vertices and transform to world space
+            // 获取顶点并变换到世界空间
             vA.fromBufferAttribute(pos, a).applyMatrix4(matrix);
             vB.fromBufferAttribute(pos, b).applyMatrix4(matrix);
             vC.fromBufferAttribute(pos, c).applyMatrix4(matrix);
 
-            // Compute normal
+            // 计算法线
             vAB.subVectors(vB, vA);
             vAC.subVectors(vC, vA);
             n.crossVectors(vAB, vAC).normalize();
 
-            // Write to buffer
+            // 写入缓冲区
             view.setFloat32(offset + 0, n.x, true);
             view.setFloat32(offset + 4, n.y, true);
             view.setFloat32(offset + 8, n.z, true);

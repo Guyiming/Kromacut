@@ -3,8 +3,8 @@ import * as React from "react";
 type PossibleRef<T> = React.Ref<T> | undefined;
 
 /**
- * Set a given ref to a given value
- * This utility takes care of different types of refs: callback refs and RefObject(s)
+ * 将给定的 ref 设置为给定的值
+ * 此工具处理不同类型的 ref：回调 ref 和 RefObject
  */
 function setRef<T>(ref: PossibleRef<T>, value: T) {
   if (typeof ref === "function") {
@@ -17,8 +17,8 @@ function setRef<T>(ref: PossibleRef<T>, value: T) {
 }
 
 /**
- * A utility to compose multiple refs together
- * Accepts callback refs and RefObject(s)
+ * 用于将多个 ref 组合在一起的工具
+ * 接受回调 ref 和 RefObject
  */
 function composeRefs<T>(...refs: PossibleRef<T>[]): React.RefCallback<T> {
   return (node) => {
@@ -31,10 +31,9 @@ function composeRefs<T>(...refs: PossibleRef<T>[]): React.RefCallback<T> {
       return cleanup;
     });
 
-    // React <19 will log an error to the console if a callback ref returns a
-    // value. We don't use ref cleanups internally so this will only happen if a
-    // user's ref callback returns a value, which we only expect if they are
-    // using the cleanup functionality added in React 19.
+    // React <19 在回调 ref 返回值时会向控制台记录错误。我们内部不
+    // 使用 ref 清理，因此只有在用户的 ref 回调返回值时才会发生这种情况，
+    // 这种情况我们只在用户使用 React 19 添加的清理功能时才预期会出现。
     if (hasCleanup) {
       return () => {
         for (let i = 0; i < cleanups.length; i++) {
@@ -51,8 +50,8 @@ function composeRefs<T>(...refs: PossibleRef<T>[]): React.RefCallback<T> {
 }
 
 /**
- * A custom hook that composes multiple refs
- * Accepts callback refs and RefObject(s)
+ * 一个组合多个 ref 的自定义 Hook
+ * 接受回调 ref 和 RefObject
  */
 function useComposedRefs<T>(...refs: PossibleRef<T>[]): React.RefCallback<T> {
   // biome-ignore lint/correctness/useExhaustiveDependencies: we want to memoize by all values

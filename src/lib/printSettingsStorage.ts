@@ -1,5 +1,5 @@
 /**
- * Persistence helpers for 3D print settings (layer height, pixel size, etc.).
+ * 3D 打印设置（层高、像素尺寸等）的持久化辅助函数。
  */
 
 export const PRINT_SETTINGS_STORAGE_KEY = 'kromacut:3d-print-settings';
@@ -52,6 +52,6 @@ export const savePrintSettingsToStorage = (settings: PrintSettings) => {
     try {
         window.localStorage.setItem(PRINT_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     } catch {
-        // Ignore storage failures (e.g., private mode, quota exceeded).
+        // 忽略存储失败（例如隐私模式、超出配额）。
     }
 };

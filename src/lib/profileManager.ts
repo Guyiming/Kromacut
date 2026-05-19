@@ -45,7 +45,7 @@ export function saveLastProfileId(id: string | null) {
             localStorage.removeItem(LAST_PROFILE_KEY);
         }
     } catch {
-        // ignore
+        // 忽略
     }
 }
 
@@ -53,7 +53,7 @@ export function saveProfilesToStorage(profiles: AutoPaintProfile[]) {
     try {
         localStorage.setItem(PROFILES_STORAGE_KEY, JSON.stringify(profiles));
     } catch {
-        // ignore storage errors
+        // 忽略存储错误
     }
 }
 
@@ -89,7 +89,7 @@ export function deleteProfile(profiles: AutoPaintProfile[], id: string): AutoPai
     return profiles.filter((p) => p.id !== id);
 }
 
-/** Check if two filament arrays are identical by color+td (order-sensitive). */
+/** 通过 color+td 检查两个耗材数组是否相同（顺序敏感）。 */
 const filamentCalibrationSignature = (filament: Filament) =>
     JSON.stringify(filament.calibration ?? null);
 
@@ -104,7 +104,7 @@ function filamentsEqual(a: Filament[], b: Filament[]): boolean {
     );
 }
 
-/** Derive a unique name by appending a numeric suffix if the name already exists. */
+/** 如果名称已存在，则通过追加数字后缀派生唯一名称。 */
 function deduplicateName(name: string, existing: AutoPaintProfile[]): string {
     const names = new Set(existing.map((p) => p.name));
     if (!names.has(name)) return name;
@@ -122,10 +122,10 @@ export interface ImportResult {
 }
 
 /**
- * Import one or more profiles with duplicate prevention:
- * - ID match: overwrite existing profile
- * - Content match (different ID): skip
- * - Name match (different ID, different content): rename with numeric suffix
+ * 导入一个或多个配置文件，并防止重复：
+ * - ID 匹配：覆盖已有的配置文件
+ * - 内容匹配（不同 ID）：跳过
+ * - 名称匹配（不同 ID，不同内容）：使用数字后缀重命名
  */
 export function importProfiles(
     existing: AutoPaintProfile[],
@@ -140,7 +140,7 @@ export function importProfiles(
     };
 
     for (const raw of incoming) {
-        // Validate required fields
+        // 验证必需字段
         if (!raw || typeof raw.name !== 'string' || !Array.isArray(raw.filaments)) continue;
 
         const validFilaments = raw.filaments.filter(
@@ -158,7 +158,7 @@ export function importProfiles(
             updatedAt: now,
         };
 
-        // 1. ID match → overwrite
+        // 1. ID 匹配 → 覆盖
         const idMatch = result.profiles.findIndex((p) => p.id === profile.id);
         if (idMatch !== -1) {
             result.profiles[idMatch] = { ...profile, updatedAt: now };
@@ -167,7 +167,7 @@ export function importProfiles(
             continue;
         }
 
-        // 2. Content match (same filaments) → skip
+        // 2. 内容匹配（耗材相同）→ 跳过
         const contentMatch = result.profiles.find((p) =>
             filamentsEqual(p.filaments, validFilaments)
         );
@@ -176,7 +176,7 @@ export function importProfiles(
             continue;
         }
 
-        // 3. Name match → rename
+        // 3. 名称匹配 → 重命名
         const nameMatch = result.profiles.some((p) => p.name === profile.name);
         if (nameMatch) {
             profile.name = deduplicateName(profile.name, result.profiles);
@@ -191,8 +191,8 @@ export function importProfiles(
 }
 
 /**
- * Parse a file's JSON content into an array of profiles to import.
- * Supports both single profile objects and arrays of profiles.
+ * 将文件的 JSON 内容解析为待导入的配置文件数组。
+ * 支持单个配置文件对象和配置文件数组。
  */
 export function parseProfileFile(json: string): AutoPaintProfile[] | null {
     try {
@@ -207,12 +207,12 @@ export function parseProfileFile(json: string): AutoPaintProfile[] | null {
     }
 }
 
-/** Build an export blob for a profile. */
+/** 为配置文件构建导出 blob。 */
 export function exportProfileBlob(profile: AutoPaintProfile): Blob {
     return new Blob([JSON.stringify(profile, null, 2)], { type: 'application/json' });
 }
 
-/** Sanitize a name for use as a filename. */
+/** 清理名称以便用作文件名。 */
 export function profileFileName(name: string): string {
     return `${name.replace(/[^a-zA-Z0-9_-]/g, '_')}.kapp`;
 }

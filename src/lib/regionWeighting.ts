@@ -1,32 +1,32 @@
 /**
- * Region Weighting Utilities
+ * 区域权重工具
  *
- * Provides tools for creating importance masks that prioritize specific image regions
- * during optimization. Common use cases:
- * - Focus on faces in portraits
- * - Emphasize foreground subjects
- * - Prioritize center regions (rule of thirds)
- * - Manual brush-based importance painting
+ * 提供创建重要性遮罩的工具，可在优化过程中优先考虑特定的图像区域。
+ * 常见用例：
+ * - 聚焦于人像中的人脸
+ * - 强调前景主体
+ * - 优先考虑中心区域（三分法构图）
+ * - 基于手动笔刷的重要性绘制
  */
 
 // ============================================================================
-// Type Definitions
+// 类型定义
 // ============================================================================
 
 export interface RegionWeightOptions {
     method: 'uniform' | 'center-weighted' | 'edge-detection' | 'face-detection' | 'custom';
-    centerStrength?: number; // 0-1, strength of center bias
-    edgeThreshold?: number; // 0-255, threshold for edge detection
-    customMask?: Float32Array; // User-provided weights
+    centerStrength?: number; // 0-1，中心偏向的强度
+    edgeThreshold?: number; // 0-255，边缘检测的阈值
+    customMask?: Float32Array; // 用户提供的权重
 }
 
 // ============================================================================
-// Weight Map Generation
+// 权重图生成
 // ============================================================================
 
 /**
- * Generate a weight map for an image.
- * Returns Float32Array where each value is 0-1 importance weight.
+ * 为图像生成权重图。
+ * 返回的 Float32Array 中每个值为 0-1 的重要性权重。
  */
 export function generateWeightMap(
     imageData: ImageData,
@@ -60,15 +60,15 @@ export function generateWeightMap(
             weights.fill(1.0);
     }
 
-    // Normalize to 0-1 range
+    // 归一化到 0-1 范围
     normalizeWeights(weights);
 
     return weights;
 }
 
 /**
- * Generate center-weighted importance map using Gaussian fall-off.
- * Center of image has weight 1.0, edges fade based on strength parameter.
+ * 使用高斯衰减生成中心加权的重要性图。
+ * 图像中心权重为 1.0，边缘根据 strength 参数衰减。
  */
 export function generateCenterWeightedMapSimple(
     width: number,
@@ -87,8 +87,8 @@ export function generateCenterWeightedMapSimple(
             const dist = Math.sqrt(dx * dx + dy * dy);
             const normalizedDist = dist / maxDist;
 
-            // Gaussian fall-off: weight = 1 at center, decreases with distance
-            // strength controls how quickly weight falls off
+            // 高斯衰减：在中心处权重为 1，随距离减小
+            // strength 控制权重衰减的速度
             const weight = Math.exp(-((normalizedDist * normalizedDist) / (2 * (1 - strength))));
 
             weights[y * width + x] = weight;
@@ -100,8 +100,8 @@ export function generateCenterWeightedMapSimple(
 }
 
 /**
- * Generate a simple edge-priority map from geometry only.
- * Weights increase toward the image borders and are normalized to 0-1.
+ * 仅依据几何信息生成简单的边缘优先权重图。
+ * 权重朝向图像边界递增，并归一化到 0-1。
  */
 export function generateEdgeWeightedMapSimple(width: number, height: number): Float32Array {
     const weights = new Float32Array(width * height);
@@ -116,7 +116,7 @@ export function generateEdgeWeightedMapSimple(width: number, height: number): Fl
             const dist = Math.sqrt(dx * dx + dy * dy);
             const normalizedDist = maxDist > 0 ? dist / maxDist : 0;
 
-            // Low in center, high toward borders
+            // 中心低，朝向边界递增
             weights[y * width + x] = Math.pow(normalizedDist, 1.35);
         }
     }
@@ -126,8 +126,8 @@ export function generateEdgeWeightedMapSimple(width: number, height: number): Fl
 }
 
 /**
- * Generate center-weighted importance map using Gaussian fall-off.
- * Center of image has weight 1.0, edges fade based on strength parameter.
+ * 使用高斯衰减生成中心加权的重要性图。
+ * 图像中心权重为 1.0，边缘根据 strength 参数衰减。
  */
 function generateCenterWeightedMap(
     width: number,
@@ -146,8 +146,8 @@ function generateCenterWeightedMap(
             const dist = Math.sqrt(dx * dx + dy * dy);
             const normalizedDist = dist / maxDist;
 
-            // Gaussian fall-off: weight = 1 at center, decreases with distance
-            // strength controls how quickly weight falls off
+            // 高斯衰减：在中心处权重为 1，随距离减小
+            // strength 控制权重衰减的速度
             const weight = Math.exp(-((normalizedDist * normalizedDist) / (2 * (1 - strength))));
 
             weights[y * width + x] = weight;
@@ -156,8 +156,8 @@ function generateCenterWeightedMap(
 }
 
 /**
- * Generate edge-weighted importance map using Sobel edge detection.
- * Areas with high edge density get higher weight (more detail to preserve).
+ * 使用 Sobel 边缘检测生成基于边缘的重要性图。
+ * 边缘密度高的区域获得更高权重（细节保留更多）。
  */
 function generateEdgeWeightedMap(
     imageData: ImageData,
@@ -166,7 +166,7 @@ function generateEdgeWeightedMap(
 ): void {
     const { width, height, data } = imageData;
 
-    // Sobel kernels
+    // Sobel 卷积核
     const sobelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
     const sobelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
 
@@ -175,14 +175,14 @@ function generateEdgeWeightedMap(
             let gx = 0;
             let gy = 0;
 
-            // Apply Sobel operator in 3x3 window
+            // 在 3x3 窗口内应用 Sobel 算子
             for (let ky = -1; ky <= 1; ky++) {
                 for (let kx = -1; kx <= 1; kx++) {
                     const px = x + kx;
                     const py = y + ky;
                     const idx = (py * width + px) * 4;
 
-                    // Use luminance for grayscale
+                    // 灰度图使用亮度值
                     const luminance =
                         0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
 
@@ -194,12 +194,12 @@ function generateEdgeWeightedMap(
 
             const magnitude = Math.sqrt(gx * gx + gy * gy);
 
-            // Weight proportional to edge strength
+            // 权重与边缘强度成正比
             weights[y * width + x] = magnitude > threshold ? 1.0 : 0.5;
         }
     }
 
-    // Fill borders with 0.5 (couldn't compute edges)
+    // 边界以 0.5 填充（无法计算边缘）
     for (let x = 0; x < width; x++) {
         weights[x] = 0.5;
         weights[(height - 1) * width + x] = 0.5;
@@ -211,7 +211,7 @@ function generateEdgeWeightedMap(
 }
 
 /**
- * Normalize weights to 0-1 range while preserving relative differences.
+ * 在保留相对差异的前提下，将权重归一化到 0-1 范围。
  */
 function normalizeWeights(weights: Float32Array): void {
     let min = Infinity;
@@ -233,11 +233,11 @@ function normalizeWeights(weights: Float32Array): void {
 }
 
 // ============================================================================
-// Weight Map Manipulation
+// 权重图操作
 // ============================================================================
 
 /**
- * Apply Gaussian blur to weight map for smooth transitions.
+ * 对权重图应用高斯模糊以实现平滑过渡。
  */
 export function blurWeightMap(
     weights: Float32Array,
@@ -276,7 +276,7 @@ export function blurWeightMap(
 }
 
 /**
- * Create 2D Gaussian kernel for blurring.
+ * 创建用于模糊的二维高斯卷积核。
  */
 function createGaussianKernel(radius: number): Float32Array {
     const size = radius * 2 + 1;
@@ -295,7 +295,7 @@ function createGaussianKernel(radius: number): Float32Array {
         }
     }
 
-    // Normalize
+    // 归一化
     for (let i = 0; i < kernel.length; i++) {
         kernel[i] /= sum;
     }
@@ -304,7 +304,7 @@ function createGaussianKernel(radius: number): Float32Array {
 }
 
 /**
- * Combine multiple weight maps using specified blending mode.
+ * 使用指定的混合模式合并多个权重图。
  */
 export function combineWeightMaps(
     maps: Float32Array[],
@@ -344,7 +344,7 @@ export function combineWeightMaps(
 }
 
 /**
- * Invert weight map (high importance becomes low, vice versa).
+ * 反转权重图（高重要性变低，反之亦然）。
  */
 export function invertWeightMap(weights: Float32Array): Float32Array {
     const inverted = new Float32Array(weights.length);
@@ -355,7 +355,7 @@ export function invertWeightMap(weights: Float32Array): Float32Array {
 }
 
 /**
- * Apply threshold to weight map (binary mask).
+ * 对权重图应用阈值（二值遮罩）。
  */
 export function thresholdWeightMap(
     weights: Float32Array,
@@ -371,12 +371,12 @@ export function thresholdWeightMap(
 }
 
 // ============================================================================
-// Visualization Helpers
+// 可视化辅助
 // ============================================================================
 
 /**
- * Convert weight map to RGBA ImageData for visualization.
- * Uses heatmap color scheme (blue=low, red=high).
+ * 将权重图转换为 RGBA ImageData 用于可视化。
+ * 使用热力图配色方案（蓝色=低，红色=高）。
  */
 export function weightMapToImageData(
     weights: Float32Array,
@@ -400,8 +400,8 @@ export function weightMapToImageData(
 }
 
 /**
- * Generate heatmap color for a value in [0, 1].
- * Blue (cold) → Green → Yellow → Red (hot)
+ * 为 [0, 1] 范围内的值生成热力图颜色。
+ * 蓝色（冷）→ 绿色 → 黄色 → 红色（热）
  */
 function heatmapColor(value: number): { r: number; g: number; b: number } {
     const v = Math.max(0, Math.min(1, value));
@@ -409,25 +409,25 @@ function heatmapColor(value: number): { r: number; g: number; b: number } {
     let r, g, b;
 
     if (v < 0.25) {
-        // Blue to cyan
+        // 蓝到青
         const t = v / 0.25;
         r = 0;
         g = Math.round(t * 255);
         b = 255;
     } else if (v < 0.5) {
-        // Cyan to green
+        // 青到绿
         const t = (v - 0.25) / 0.25;
         r = 0;
         g = 255;
         b = Math.round((1 - t) * 255);
     } else if (v < 0.75) {
-        // Green to yellow
+        // 绿到黄
         const t = (v - 0.5) / 0.25;
         r = Math.round(t * 255);
         g = 255;
         b = 0;
     } else {
-        // Yellow to red
+        // 黄到红
         const t = (v - 0.75) / 0.25;
         r = 255;
         g = Math.round((1 - t) * 255);

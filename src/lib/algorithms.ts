@@ -1,16 +1,16 @@
-// Lightweight image algorithms for Kromacut
-// Each function operates on an ImageData instance and returns the modified ImageData.
+// Kromacut 的轻量级图像算法
+// 每个函数都在 ImageData 实例上操作，并返回修改后的 ImageData。
 
-/** Options accepted by all async algorithm functions. */
+/** 所有异步算法函数接受的选项。 */
 export interface AlgoOptions {
-    /** Called with a 0..1 value representing sub-step progress within the algorithm. */
+    /** 使用 0..1 之间的值调用，表示算法内子步骤的进度。 */
     onProgress?: (value: number) => void;
 }
 
 /**
- * Timer-based yield helper.  Checks if enough wall-clock time has elapsed
- * since the last yield; if so, yields to the event loop via setTimeout(0)
- * so the browser can paint frames and the progress bar can update.
+ * 基于计时器的让出辅助函数。检查自上次让出以来经过的实际时间是否足够，
+ * 如果是，则通过 setTimeout(0) 让出给事件循环，
+ * 这样浏览器可以绘制帧，进度条也可以更新。
  */
 function createYielder(intervalMs = 30) {
     let last = performance.now();
@@ -24,8 +24,8 @@ function createYielder(intervalMs = 30) {
 }
 
 /**
- * Async pixel-loop helper: build a histogram of unique opaque colors.
- * Yields periodically so the UI stays responsive.
+ * 异步像素循环辅助函数：构建唯一不透明颜色的直方图。
+ * 周期性让出以保持 UI 响应。
  */
 async function buildHistogramAsync(d: Uint8ClampedArray, onProgress?: (frac: number) => void) {
     const maybeYield = createYielder();
@@ -38,7 +38,7 @@ async function buildHistogramAsync(d: Uint8ClampedArray, onProgress?: (frac: num
             map.set(key, (map.get(key) || 0) + 1);
         }
         if ((i & 0x3fffc) === 0) {
-            // every ~65k pixels
+            // 每约 65k 个像素
             onProgress?.(i / 4 / total);
             await maybeYield();
         }
@@ -48,8 +48,8 @@ async function buildHistogramAsync(d: Uint8ClampedArray, onProgress?: (frac: num
 }
 
 /**
- * Async pixel-loop helper: apply a color lookup map to every pixel.
- * Yields periodically so the UI stays responsive.
+ * 异步像素循环辅助函数：对每个像素应用颜色查找映射。
+ * 周期性让出以保持 UI 响应。
  */
 async function applyLookupAsync(
     d: Uint8ClampedArray,
@@ -77,7 +77,7 @@ async function applyLookupAsync(
     onProgress?.(1);
 }
 
-/** Convert a histogram Map into the entry array used by all algorithms. */
+/** 将直方图 Map 转换为所有算法使用的条目数组。 */
 function histogramToEntries(map: Map<number, number>) {
     const entries: { key: number; r: number; g: number; b: number; count: number }[] = [];
     map.forEach((count, key) => {
@@ -99,12 +99,12 @@ export async function posterizeImageData(
 ): Promise<ImageData> {
     const d = data.data;
     const maybeYield = createYielder();
-    // sanitize and clamp
+    // 清理并钳制
     weight = Math.max(2, Math.min(256, Math.floor(weight)));
 
-    // For very small palettes it's usually more visually pleasing to
-    // quantize luminance (grayscale) rather than breaking color channels
-    // which can produce strong color tints (e.g. red outlines at 2 colors).
+    // 对于非常小的调色板，量化亮度（灰度）通常比拆分颜色通道
+    // 在视觉上更令人愉悦，因为后者可能产生强烈的色调
+    // （例如 2 色时出现的红色轮廓）。
     if (weight <= 4) {
         const levels = weight;
         const steps = Math.max(0, levels - 1);
@@ -124,13 +124,13 @@ export async function posterizeImageData(
         return enforcePaletteSizeAsync(data, weight, (f) => opts?.onProgress?.(0.5 + f * 0.5));
     }
 
-    // For larger palettes, distribute levels across R/G/B trying to get
-    // a product close to the requested weight while keeping channels balanced.
+    // 对于较大的调色板，将级别分配到 R/G/B 通道，
+    // 尝试使乘积接近请求的 weight，同时保持各通道平衡。
     let r = Math.max(1, Math.floor(Math.cbrt(weight)));
     let g = r;
     let b = r;
 
-    // Grow the smallest channel as long as it doesn't make the product exceed weight
+    // 在不使乘积超过 weight 的前提下，扩展最小的通道
     while (r * g * b < weight) {
         if (r <= g && r <= b) {
             if ((r + 1) * g * b <= weight) r++;
@@ -150,9 +150,8 @@ export async function posterizeImageData(
 
     const total = d.length / 4;
     for (let i = 0; i < d.length; i += 4) {
-        // quantize each channel independently; if a channel has only one
-        // level (steps === 0) map to mid-range (128) to avoid pushing the
-        // overall color toward black.
+        // 独立量化每个通道；如果某个通道只有一个级别
+        // (steps === 0)，则映射到中间值 (128)，避免将整体颜色推向黑色。
         for (let c = 0; c < 3; c++) {
             const val = d[i + c];
             const steps = stepsArr[c];
@@ -163,7 +162,7 @@ export async function posterizeImageData(
                 d[i + c] = Math.round(idx * scales[c]);
             }
         }
-        // leave alpha untouched
+        // 不修改 alpha 通道
         if ((i & 0x3fffc) === 0) {
             opts?.onProgress?.((0.5 * (i / 4)) / total);
             await maybeYield();
@@ -175,9 +174,8 @@ export async function posterizeImageData(
 }
 
 /**
- * Median-cut quantization: builds a palette of up to `weight` colors
- * by recursively splitting color boxes along the longest channel at the
- * pixel-count median. Operates on ImageData in-place and returns it.
+ * 中位切分量化：通过沿最长通道在像素计数中位数处递归地分割颜色盒，
+ * 构建最多 `weight` 种颜色的调色板。在 ImageData 上原地操作并返回。
  */
 export async function medianCutImageData(
     data: ImageData,
@@ -187,7 +185,7 @@ export async function medianCutImageData(
     const d = data.data;
     weight = Math.max(2, Math.min(256, Math.floor(weight)));
 
-    // Build histogram of unique colors to reduce work
+    // 构建唯一颜色的直方图以减少工作量
     const map = await buildHistogramAsync(d, (f) => opts?.onProgress?.(f * 0.2));
 
     const entries = histogramToEntries(map);
@@ -229,11 +227,11 @@ export async function medianCutImageData(
         return { items, rMin, rMax, gMin, gMax, bMin, bMax, count };
     };
 
-    // start with one box containing all entries
+    // 从一个包含所有条目的盒子开始
     const boxes: Box[] = [makeBox(entries)];
 
     while (boxes.length < weight) {
-        // pick the box with largest color range (by max channel span)
+        // 选择颜色范围最大的盒子（按最大通道跨度）
         let idx = -1;
         let maxRange = -1;
         for (let i = 0; i < boxes.length; i++) {
@@ -247,11 +245,11 @@ export async function medianCutImageData(
                 idx = i;
             }
         }
-        if (idx === -1) break; // no splitable box left
+        if (idx === -1) break; // 没有可分割的盒子了
 
         const box = boxes[idx];
 
-        // choose channel to split: the one with largest range
+        // 选择要分割的通道：范围最大的那个
         const rRange = box.rMax - box.rMin;
         const gRange = box.gMax - box.gMin;
         const bRange = box.bMax - box.bMin;
@@ -259,12 +257,12 @@ export async function medianCutImageData(
         if (gRange >= rRange && gRange >= bRange) channel = 'g';
         else if (bRange >= rRange && bRange >= gRange) channel = 'b';
 
-        // sort items by chosen channel
+        // 按所选通道排序条目
         box.items.sort((a, b) =>
             channel === 'r' ? a.r - b.r : channel === 'g' ? a.g - b.g : a.b - b.b
         );
 
-        // find median split by cumulative pixel counts
+        // 通过累积像素计数找到中位数分割点
         const total = box.count;
         let acc = 0;
         let splitIndex = 0;
@@ -276,20 +274,20 @@ export async function medianCutImageData(
             }
         }
 
-        // avoid degenerate split
+        // 避免退化的分割
         if (splitIndex <= 0) splitIndex = 1;
         if (splitIndex >= box.items.length) splitIndex = box.items.length - 1;
 
         const aItems = box.items.slice(0, splitIndex);
         const bItems = box.items.slice(splitIndex);
 
-        // replace the box with two new boxes
+        // 用两个新盒子替换原盒子
         boxes.splice(idx, 1, makeBox(aItems), makeBox(bItems));
     }
 
     opts?.onProgress?.(0.4);
 
-    // compute palette (weighted average per box) and build lookup
+    // 计算调色板（每个盒子的加权平均值）并构建查找表
     const lookup = new Map<number, [number, number, number]>();
     for (const box of boxes) {
         let rSum = 0,
@@ -310,18 +308,18 @@ export async function medianCutImageData(
         }
     }
 
-    // apply lookup
+    // 应用查找表
     await applyLookupAsync(d, lookup, (f) => opts?.onProgress?.(0.4 + f * 0.3));
     opts?.onProgress?.(0.7);
 
     return enforcePaletteSizeAsync(data, weight, (f) => opts?.onProgress?.(0.7 + f * 0.3));
 }
 
-// (default export consolidated at end)
+// （默认导出统一在文件末尾）
 
 /**
- * K-means color quantization (weighted by pixel counts).
- * Uses k-means++ initialization and a small fixed number of iterations.
+ * K-means 颜色量化（按像素计数加权）。
+ * 使用 k-means++ 初始化和较少的固定迭代次数。
  */
 export async function kmeansImageData(
     data: ImageData,
@@ -331,7 +329,7 @@ export async function kmeansImageData(
     const d = data.data;
     weight = Math.max(2, Math.min(256, Math.floor(weight)));
 
-    // Build unique color entries with counts
+    // 构建带计数的唯一颜色条目
     const map = await buildHistogramAsync(d, (f) => opts?.onProgress?.(f * 0.2));
     const entries = histogramToEntries(map);
 
@@ -339,7 +337,7 @@ export async function kmeansImageData(
         return enforcePaletteSizeAsync(data, weight, (f) => opts?.onProgress?.(0.2 + f * 0.8));
 
     opts?.onProgress?.(0.2);
-    // helper: squared distance
+    // 辅助函数：平方距离
     const dist2 = (
         a: { r: number; g: number; b: number },
         b: { r: number; g: number; b: number }
@@ -350,9 +348,9 @@ export async function kmeansImageData(
         return dr * dr + dg * dg + db * db;
     };
 
-    // k-means++ init
+    // k-means++ 初始化
     const centroids: { r: number; g: number; b: number }[] = [];
-    // pick first randomly weighted
+    // 按权重随机选择第一个
     let totalCount = 0;
     for (const e of entries) totalCount += e.count;
     let r = Math.random() * totalCount;
@@ -367,7 +365,7 @@ export async function kmeansImageData(
         centroids.push({ r: entries[0].r, g: entries[0].g, b: entries[0].b });
 
     while (centroids.length < weight) {
-        // compute D^2 to nearest centroid for each entry
+        // 计算每个条目到最近质心的 D^2
         let sum = 0;
         const dists: number[] = new Array(entries.length);
         for (let i = 0; i < entries.length; i++) {
@@ -380,7 +378,7 @@ export async function kmeansImageData(
             sum += dists[i];
         }
         if (sum === 0) break;
-        // pick new centroid weighted by dists
+        // 按距离权重选择新的质心
         let pick = Math.random() * sum;
         let idx = 0;
         for (; idx < entries.length; idx++) {
@@ -395,12 +393,12 @@ export async function kmeansImageData(
         });
     }
 
-    // iterate k-means (weighted) -- limited iterations for speed
+    // 迭代 k-means（加权）-- 限制迭代次数以提高速度
     const maxIter = 8;
     const assignments = new Array(entries.length).fill(-1);
     for (let iter = 0; iter < maxIter; iter++) {
         let changed = false;
-        // assign
+        // 分配
         for (let i = 0; i < entries.length; i++) {
             let best = -1;
             let bestDist = Infinity;
@@ -416,7 +414,7 @@ export async function kmeansImageData(
                 changed = true;
             }
         }
-        // recompute centroids
+        // 重新计算质心
         const sums: { r: number; g: number; b: number; w: number }[] = centroids.map(() => ({
             r: 0,
             g: 0,
@@ -433,7 +431,7 @@ export async function kmeansImageData(
         }
         for (let c = 0; c < centroids.length; c++) {
             if (sums[c].w === 0) {
-                // re-seed empty centroid with a random entry
+                // 用一个随机条目重新种子化空的质心
                 const pick = entries[Math.floor(Math.random() * entries.length)];
                 centroids[c] = { r: pick.r, g: pick.g, b: pick.b };
             } else {
@@ -447,7 +445,7 @@ export async function kmeansImageData(
         if (!changed) break;
     }
 
-    // build lookup: map original color to nearest centroid
+    // 构建查找表：将原始颜色映射到最近的质心
     const lookup = new Map<number, [number, number, number]>();
     for (let i = 0; i < entries.length; i++) {
         let best = -1;
@@ -465,7 +463,7 @@ export async function kmeansImageData(
 
     opts?.onProgress?.(0.5);
 
-    // apply mapping
+    // 应用映射
     await applyLookupAsync(d, lookup, (f) => opts?.onProgress?.(0.5 + f * 0.2));
     opts?.onProgress?.(0.7);
 
@@ -473,8 +471,8 @@ export async function kmeansImageData(
 }
 
 /**
- * Octree color quantization. Builds an octree up to depth 8, reduces
- * nodes until the leaf count <= weight, then maps pixels to leaf averages.
+ * 八叉树颜色量化。构建深度为 8 的八叉树，缩减节点直到叶子数 <= weight，
+ * 然后将像素映射到叶子的平均值。
  */
 export async function octreeImageData(
     data: ImageData,
@@ -484,7 +482,7 @@ export async function octreeImageData(
     const d = data.data;
     weight = Math.max(2, Math.min(256, Math.floor(weight)));
 
-    // build histogram of unique colors
+    // 构建唯一颜色的直方图
     const map = await buildHistogramAsync(d, (f) => opts?.onProgress?.(f * 0.2));
     const entries = histogramToEntries(map);
 
@@ -638,9 +636,9 @@ export default {
 };
 
 /**
- * Wu color quantization (fast, high-quality). Builds 3D moments over a
- * 33x33x33 color cube, partitions space to minimize squared error, and
- * maps pixels to the computed palette. Operates in-place on ImageData.
+ * Wu 颜色量化（快速、高质量）。在 33x33x33 颜色立方体上构建 3D 矩，
+ * 划分空间以最小化平方误差，并将像素映射到计算出的调色板。
+ * 在 ImageData 上原地操作。
  */
 export async function wuImageData(
     data: ImageData,
@@ -650,7 +648,7 @@ export async function wuImageData(
     const d = data.data;
     weight = Math.max(2, Math.min(256, Math.floor(weight)));
 
-    // Build histogram of unique colors to reduce work (weighted entries)
+    // 构建唯一颜色的直方图以减少工作量（带权条目）
     const map = await buildHistogramAsync(d, (f) => opts?.onProgress?.(f * 0.2));
     const entries = histogramToEntries(map);
 
@@ -658,20 +656,20 @@ export async function wuImageData(
         return enforcePaletteSizeAsync(data, weight, (f) => opts?.onProgress?.(0.2 + f * 0.8));
 
     opts?.onProgress?.(0.2);
-    // Wu uses a 33x33x33 cube (indices 0..32) where colors are quantized by >> 3
+    // Wu 使用 33x33x33 立方体（索引 0..32），其中颜色通过 >> 3 量化
     const SIDE = 33;
     const SIZE = SIDE * SIDE * SIDE;
 
     const getIndex = (r: number, g: number, b: number) => (r * SIDE + g) * SIDE + b;
 
-    // moments: weight, r, g, b, and sum of squares
+    // 矩：weight、r、g、b 以及平方和
     const vwt = new Float64Array(SIZE);
     const vmr = new Float64Array(SIZE);
     const vmg = new Float64Array(SIZE);
     const vmb = new Float64Array(SIZE);
     const m2 = new Float64Array(SIZE);
 
-    // populate histogram at quantized positions (1..32). leave 0 as padding
+    // 在量化位置 (1..32) 填充直方图。0 作为填充保留
     for (const e of entries) {
         const ir = (e.r >> 3) + 1;
         const ig = (e.g >> 3) + 1;
@@ -684,7 +682,7 @@ export async function wuImageData(
         m2[idx] += (e.r * e.r + e.g * e.g + e.b * e.b) * e.count;
     }
 
-    // compute cumulative moments
+    // 计算累积矩
     for (let r = 1; r < SIDE; r++) {
         for (let g = 1; g < SIDE; g++) {
             let rowW = 0,
@@ -797,7 +795,7 @@ export async function wuImageData(
         b1: SIDE - 1,
     });
 
-    // maximize variance reduction for a given box along a chosen axis
+    // 在给定盒子上沿所选轴最大化方差缩减
     const maximize = (box: Box, dir: 'r' | 'g' | 'b') => {
         let bestScore = -1;
         let bestPos = -1;
@@ -891,11 +889,11 @@ export async function wuImageData(
         return { score: bestScore, pos: bestPos };
     };
 
-    // partition boxes
+    // 划分盒子
     const boxes: Box[] = [createBox()];
 
     while (boxes.length < weight) {
-        // find box with largest variance
+        // 寻找方差最大的盒子
         let maxVar = -1;
         let idx = -1;
         for (let i = 0; i < boxes.length; i++) {
@@ -908,12 +906,12 @@ export async function wuImageData(
         if (idx === -1 || maxVar <= 0) break;
 
         const box = boxes[idx];
-        // try splits along each axis
+        // 尝试沿每个轴进行分割
         const rSplit = maximize(box, 'r');
         const gSplit = maximize(box, 'g');
         const bSplit = maximize(box, 'b');
 
-        // pick best split
+        // 选择最佳分割
         const best = [
             { dir: 'r', score: rSplit.score, pos: rSplit.pos },
             { dir: 'g', score: gSplit.score, pos: gSplit.pos },
@@ -921,7 +919,7 @@ export async function wuImageData(
         ].sort((a, b) => b.score - a.score)[0];
 
         if (best.score <= 0 || best.pos < 0) {
-            // Fallback median split on the largest axis to ensure progress
+            // 回退到沿最大轴的中位数分割以确保进度
             const rRange = box.r1 - box.r0;
             const gRange = box.g1 - box.g0;
             const bRange = box.b1 - box.b0;
@@ -991,7 +989,7 @@ export async function wuImageData(
             continue;
         }
 
-        // create two new boxes by splitting
+        // 通过分割创建两个新盒子
         let box1: Box, box2: Box;
         if (best.dir === 'r') {
             box1 = {
@@ -1045,12 +1043,12 @@ export async function wuImageData(
                 b1: box.b1,
             };
         }
-        // replace current box with box1 and push box2
+        // 用 box1 替换当前盒子并加入 box2
         boxes.splice(idx, 1, box1);
         boxes.push(box2);
     }
 
-    // compute palette (average color in each box)
+    // 计算调色板（每个盒子中的平均颜色）
     const palette: [number, number, number][] = boxes.map((b) => {
         const w = volumeWeight(b);
         if (w === 0) return [0, 0, 0];
@@ -1058,10 +1056,10 @@ export async function wuImageData(
         return [Math.round(m.r / w), Math.round(m.g / w), Math.round(m.b / w)];
     });
 
-    // build lookup from original color to palette color by locating which box contains its quantized coords
+    // 通过定位哪个盒子包含其量化坐标，构建从原始颜色到调色板颜色的查找表
     const lookup = new Map<number, [number, number, number]>();
     for (let pi = 0; pi < palette.length; pi++) {
-        // not needed here; we'll map by checking boxes per entry
+        // 此处不需要；我们将逐个条目检查盒子
     }
 
     for (const e of entries) {
@@ -1089,7 +1087,7 @@ export async function wuImageData(
 
     opts?.onProgress?.(0.5);
 
-    // apply mapping
+    // 应用映射
     await applyLookupAsync(d, lookup, (f) => opts?.onProgress?.(0.5 + f * 0.2));
     opts?.onProgress?.(0.7);
 
@@ -1097,14 +1095,14 @@ export async function wuImageData(
 }
 
 /**
- * Post-pass: merge nearest palette colors until the palette length is `target`.
- * Operates in-place on the provided ImageData and returns it.
+ * 后处理：合并最近的调色板颜色，直到调色板长度为 `target`。
+ * 在提供的 ImageData 上原地操作并返回。
  */
 export function enforcePaletteSize(data: ImageData, target: number): ImageData {
     target = Math.max(2, Math.min(256, Math.floor(target)));
     const d = data.data;
 
-    // build histogram of unique colors (ignore fully transparent)
+    // 构建唯一颜色的直方图（忽略完全透明的像素）
     const map = new Map<number, number>();
     for (let i = 0; i < d.length; i += 4) {
         if (d[i + 3] === 0) continue;
@@ -1129,10 +1127,10 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
         });
     });
 
-    // If unique colors are already <= target, leave them (user allows fewer)
+    // 如果唯一颜色数已经 <= target，则保持不变（用户允许更少的颜色）
     if (entries.length <= target) return data;
 
-    // merge nearest pairs until length == target (naive O(n^2) approach)
+    // 合并最近的颜色对，直到长度 == target（朴素的 O(n^2) 方法）
     const dist2 = (
         a: { r: number; g: number; b: number },
         b: { r: number; g: number; b: number }
@@ -1143,7 +1141,7 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
         return dr * dr + dg * dg + db * db;
     };
 
-    // We'll operate on a mutable array of palette entries
+    // 我们将在一个可变的调色板条目数组上操作
     const palette = entries.slice();
 
     while (palette.length > target) {
@@ -1160,7 +1158,7 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
                 }
             }
         }
-        // merge bestI and bestJ into weighted average
+        // 将 bestI 和 bestJ 合并为加权平均
         const a = palette[bestI];
         const b = palette[bestJ];
         const wSum = a.count + b.count;
@@ -1174,7 +1172,7 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
             b: nb,
             count: wSum,
         };
-        // replace the earlier index with merged and remove the other
+        // 用合并后的项替换较早的索引并删除另一个
         if (bestI < bestJ) {
             palette.splice(bestJ, 1);
             palette.splice(bestI, 1, merged);
@@ -1184,7 +1182,7 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
         }
     }
 
-    // Build mapping from original color -> nearest palette color (after merges)
+    // 构建从原始颜色到（合并后）最近调色板颜色的映射
     const paletteColors = palette.map((p) => ({ r: p.r, g: p.g, b: p.b }));
     const lookup = new Map<number, [number, number, number]>();
     const paletteDist = (r: number, g: number, b: number, idx: number) => {
@@ -1194,7 +1192,7 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
         const db = b - p.b;
         return dr * dr + dg * dg + db * db;
     };
-    // for each unique original color, find nearest merged palette color
+    // 对每个唯一的原始颜色，找到合并后最近的调色板颜色
     for (const e of entries) {
         let best = 0;
         let bestD = Infinity;
@@ -1209,7 +1207,7 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
         lookup.set(e.key, [p.r, p.g, p.b]);
     }
 
-    // remap pixels in-place using lookup
+    // 使用查找表对像素进行原地重映射
     for (let i = 0; i < d.length; i += 4) {
         const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
         const v = lookup.get(key);
@@ -1218,7 +1216,7 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
             d[i + 1] = v[1];
             d[i + 2] = v[2];
         }
-        // normalize any partial alpha to fully opaque if not zero
+        // 将任何部分透明度规范化为完全不透明（如果不为零）
         if (d[i + 3] > 0 && d[i + 3] < 255) d[i + 3] = 255;
     }
 
@@ -1226,8 +1224,8 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
 }
 
 /**
- * Async version of enforcePaletteSize that yields periodically during
- * pixel-scanning loops so the browser can paint progress updates.
+ * enforcePaletteSize 的异步版本，在像素扫描循环中周期性让出，
+ * 以便浏览器可以绘制进度更新。
  */
 export async function enforcePaletteSizeAsync(
     data: ImageData,
@@ -1237,11 +1235,11 @@ export async function enforcePaletteSizeAsync(
     target = Math.max(2, Math.min(256, Math.floor(target)));
     const d = data.data;
 
-    // build histogram of unique colors (ignore fully transparent)
+    // 构建唯一颜色的直方图（忽略完全透明的像素）
     const map = await buildHistogramAsync(d, (f) => onProgress?.(f * 0.3));
     const entries = histogramToEntries(map);
 
-    // If unique colors are already <= target, leave them (user allows fewer)
+    // 如果唯一颜色数已经 <= target，则保持不变（用户允许更少的颜色）
     if (entries.length <= target) {
         onProgress?.(1);
         return data;
@@ -1249,7 +1247,7 @@ export async function enforcePaletteSizeAsync(
 
     onProgress?.(0.3);
 
-    // merge nearest pairs until length == target (naive O(n^2) approach)
+    // 合并最近的颜色对，直到长度 == target（朴素的 O(n^2) 方法）
     const dist2 = (
         a: { r: number; g: number; b: number },
         b: { r: number; g: number; b: number }
@@ -1309,7 +1307,7 @@ export async function enforcePaletteSizeAsync(
 
     onProgress?.(0.6);
 
-    // Build mapping from original color -> nearest palette color (after merges)
+    // 构建从原始颜色到（合并后）最近调色板颜色的映射
     const paletteColors = palette.map((p) => ({ r: p.r, g: p.g, b: p.b }));
     const lookup = new Map<number, [number, number, number]>();
     const paletteDist = (r: number, g: number, b: number, idx: number) => {
@@ -1333,7 +1331,7 @@ export async function enforcePaletteSizeAsync(
         lookup.set(e.key, [p.r, p.g, p.b]);
     }
 
-    // remap pixels in-place using lookup (with yields)
+    // 使用查找表对像素进行原地重映射（带让出）
     const applyMaybeYield = createYielder();
     const total = d.length / 4;
     for (let i = 0; i < d.length; i += 4) {
@@ -1356,19 +1354,19 @@ export async function enforcePaletteSizeAsync(
 }
 
 /**
- * Map every pixel color in `data` to the nearest color from `palette`.
- * `palette` is an array of hex strings like `#rrggbb`.
+ * 将 `data` 中的每个像素颜色映射到 `palette` 中最接近的颜色。
+ * `palette` 是形如 `#rrggbb` 的十六进制字符串数组。
  */
 export async function mapImageToPalette(
     data: ImageData,
     palette: string[],
     opts?: AlgoOptions
 ): Promise<ImageData> {
-    // window debug augmentation (safe access)
+    // window 调试增强（安全访问）
     const d = data.data;
     if (!palette || palette.length === 0) return data;
 
-    // --- Parsing helpers ---
+    // --- 解析辅助函数 ---
     const clamp = (v: number, a = 0, b = 255) => (v < a ? a : v > b ? b : v);
     const parseHex = (s: string): [number, number, number] => {
         const raw = s.replace(/^#/, '').trim();
@@ -1458,7 +1456,7 @@ export async function mapImageToPalette(
     const palLab = palRGB.map(([r, g, b]) => srgbToLab(r, g, b));
     const allowed = new Set<number>(palRGB.map(([r, g, b]) => (r << 16) | (g << 8) | b));
 
-    // Cache original color -> nearest palette color to avoid repeated Lab distance work
+    // 缓存原始颜色 -> 最近的调色板颜色，避免重复的 Lab 距离计算
     const cache = new Map<number, [number, number, number]>();
     const labCache = new Map<number, [number, number, number]>();
     const getLab = (key: number) => {
@@ -1477,11 +1475,11 @@ export async function mapImageToPalette(
 
     for (let i = 0; i < d.length; i += 4) {
         const a = d[i + 3];
-        if (a === 0) continue; // leave fully transparent pixels as-is
+        if (a === 0) continue; // 完全透明的像素保持原样
         const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
         let mapped = cache.get(key);
         if (!mapped) {
-            // If already exactly a palette color just reuse
+            // 如果已经精确等于某个调色板颜色，则直接复用
             if (allowed.has(key)) {
                 mapped = [(key >> 16) & 0xff, (key >> 8) & 0xff, key & 0xff];
             } else {
@@ -1505,7 +1503,7 @@ export async function mapImageToPalette(
         d[i] = mapped[0];
         d[i + 1] = mapped[1];
         d[i + 2] = mapped[2];
-        if (a < 255) d[i + 3] = 255; // normalize any partial alpha
+        if (a < 255) d[i + 3] = 255; // 规范化任何部分透明度
         if ((i & 0x3fffc) === 0) {
             opts?.onProgress?.(i / 4 / total);
             await maybeYield();
