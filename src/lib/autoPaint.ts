@@ -1352,6 +1352,22 @@ export function generateAutoLayers(
         };
     }
 
+    if (import.meta.env.DEV) {
+        const payload = JSON.stringify(
+            {
+                timestamp: new Date().toISOString(),
+                imageSwatches,
+            },
+            null,
+            2
+        );
+        fetch('/__log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+        }).catch(() => {});
+    }
+
     // --- 步骤 2：决定耗材排序 ---
     let sortedFilaments: Filament[];
     let optimizerResult: OptimizerResult | undefined;
