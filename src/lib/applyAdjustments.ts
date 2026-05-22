@@ -2,11 +2,13 @@
 // 每个调整键对应 sliderDefs 中的键。
 // 返回一个新的 ImageData 实例（不会修改源数据）。
 
-export interface Adjustments {
+export interface Adjustments
+{
     [key: string]: number;
 }
 
-export interface AdjustmentContext {
+export interface AdjustmentContext
+{
     width: number;
     height: number;
 }
@@ -26,15 +28,18 @@ const DEFAULTS: Record<string, number> = {
     clarity: 0,
 };
 
-export function isAllDefault(adj: Adjustments): boolean {
-    for (const k in DEFAULTS) {
+export function isAllDefault(adj: Adjustments): boolean
+{
+    for (const k in DEFAULTS)
+    {
         if ((adj[k] ?? DEFAULTS[k]) !== DEFAULTS[k]) return false;
     }
     return true;
 }
 
 // 快速 RGB <-> HSL 辅助函数（H 范围 [0,360)，S/L 范围 [0,1]）
-function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+function rgbToHsl(r: number, g: number, b: number): [number, number, number]
+{
     r /= 255;
     g /= 255;
     b /= 255;
@@ -44,9 +49,11 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
         s = 0;
     const l = (max + min) / 2;
     const d = max - min;
-    if (d !== 0) {
+    if (d !== 0)
+    {
         s = d / (1 - Math.abs(2 * l - 1));
-        switch (max) {
+        switch (max)
+        {
             case r:
                 h = (g - b) / d + (g < b ? 6 : 0);
                 break;
@@ -62,9 +69,11 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
     return [h, s, l];
 }
 
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+function hslToRgb(h: number, s: number, l: number): [number, number, number]
+{
     h = ((h % 360) + 360) % 360; // 归一化
-    if (s === 0) {
+    if (s === 0)
+    {
         const v = Math.round(l * 255);
         return [v, v, v];
     }
@@ -74,22 +83,33 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
     let r1 = 0,
         g1 = 0,
         b1 = 0;
-    if (h < 60) {
+    if (h < 60)
+    {
         r1 = c;
         g1 = x;
-    } else if (h < 120) {
+    }
+    else if (h < 120)
+    {
         r1 = x;
         g1 = c;
-    } else if (h < 180) {
+    }
+    else if (h < 180)
+    {
         g1 = c;
         b1 = x;
-    } else if (h < 240) {
+    }
+    else if (h < 240)
+    {
         g1 = x;
         b1 = c;
-    } else if (h < 300) {
+    }
+    else if (h < 300)
+    {
         r1 = x;
         b1 = c;
-    } else {
+    }
+    else
+    {
         r1 = c;
         b1 = x;
     }
@@ -100,17 +120,22 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 }
 
 // 简单的 3x3 盒式模糊，用作清晰度（局部对比度）的基础
-function boxBlur3(data: Uint8ClampedArray, w: number, h: number, out: Uint8ClampedArray) {
-    for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
+function boxBlur3(data: Uint8ClampedArray, w: number, h: number, out: Uint8ClampedArray)
+{
+    for (let y = 0; y < h; y++)
+    {
+        for (let x = 0; x < w; x++)
+        {
             let r = 0,
                 g = 0,
                 b = 0;
             let c = 0;
-            for (let dy = -1; dy <= 1; dy++) {
+            for (let dy = -1; dy <= 1; dy++)
+            {
                 const yy = y + dy;
                 if (yy < 0 || yy >= h) continue;
-                for (let dx = -1; dx <= 1; dx++) {
+                for (let dx = -1; dx <= 1; dx++)
+                {
                     const xx = x + dx;
                     if (xx < 0 || xx >= w) continue;
                     const idx = (yy * w + xx) * 4;
@@ -129,7 +154,8 @@ function boxBlur3(data: Uint8ClampedArray, w: number, h: number, out: Uint8Clamp
     }
 }
 
-export function applyAdjustments(src: ImageData, adjustments: Adjustments): ImageData {
+export function applyAdjustments(src: ImageData, adjustments: Adjustments): ImageData
+{
     if (isAllDefault(adjustments))
         return new ImageData(new Uint8ClampedArray(src.data), src.width, src.height);
 
@@ -152,12 +178,14 @@ export function applyAdjustments(src: ImageData, adjustments: Adjustments): Imag
 
     const needHSL = saturationAdj !== 0 || vibranceAdj !== 0 || hueShift !== 0;
     let blurred: Uint8ClampedArray | null = null;
-    if (clarity !== 0) {
+    if (clarity !== 0)
+    {
         blurred = new Uint8ClampedArray(out.length);
         boxBlur3(out, w, h, blurred);
     }
 
-    for (let i = 0; i < out.length; i += 4) {
+    for (let i = 0; i < out.length; i += 4)
+    {
         let r = out[i];
         let g = out[i + 1];
         let b = out[i + 2];
@@ -165,48 +193,59 @@ export function applyAdjustments(src: ImageData, adjustments: Adjustments): Imag
         if (a === 0) continue; // 跳过透明像素
 
         // 曝光
-        if (exposure !== 0) {
+        if (exposure !== 0)
+        {
             r = Math.min(255, r * exposureMul);
             g = Math.min(255, g * exposureMul);
             b = Math.min(255, b * exposureMul);
         }
         // 围绕中点（128）的对比度
-        if (contrast !== 0) {
+        if (contrast !== 0)
+        {
             const f = 1 + contrast; // 简单的线性对比度
             r = Math.max(0, Math.min(255, (r - 128) * f + 128));
             g = Math.max(0, Math.min(255, (g - 128) * f + 128));
             b = Math.max(0, Math.min(255, (b - 128) * f + 128));
         }
         // 色温 / 色调（非常近似的线性偏移）
-        if (temp !== 0 || tint !== 0) {
+        if (temp !== 0 || tint !== 0)
+        {
             // 暖色 -> 增加 R，减少 B
-            if (temp !== 0) {
+            if (temp !== 0)
+            {
                 r = Math.max(0, Math.min(255, r + 60 * temp));
                 b = Math.max(0, Math.min(255, b - 60 * temp));
             }
             // 色调：正值添加品红（R+B），负值添加绿色
-            if (tint !== 0) {
+            if (tint !== 0)
+            {
                 const amt = 50 * Math.abs(tint);
-                if (tint > 0) {
+                if (tint > 0)
+                {
                     r = Math.max(0, Math.min(255, r + amt));
                     b = Math.max(0, Math.min(255, b + amt));
                     g = Math.max(0, Math.min(255, g - amt));
-                } else {
+                }
+                else
+                {
                     g = Math.max(0, Math.min(255, g + amt));
                 }
             }
         }
 
         let hsl: [number, number, number] | null = null;
-        if (needHSL) {
+        if (needHSL)
+        {
             hsl = rgbToHsl(r, g, b);
             let hue = hsl[0];
             let sat = hsl[1];
             const lum = hsl[2];
-            if (saturationAdj !== 0) {
+            if (saturationAdj !== 0)
+            {
                 sat = Math.max(0, Math.min(1, sat * (1 + saturationAdj)));
             }
-            if (vibranceAdj !== 0) {
+            if (vibranceAdj !== 0)
+            {
                 // 对低饱和度颜色增加更多饱和度
                 const vibFactor = 1 + vibranceAdj * (1 - sat);
                 sat = Math.max(0, Math.min(1, sat * vibFactor));
@@ -221,26 +260,32 @@ export function applyAdjustments(src: ImageData, adjustments: Adjustments): Imag
         // 基于亮度的色调区域调整（在前面的操作之后）
         const lumLin = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; // 0..1
         let toneScale = 1;
-        if (lumLin < 0.1 && blacks !== 0) {
+        if (lumLin < 0.1 && blacks !== 0)
+        {
             toneScale *= 1 + blacks * 0.7; // 在深黑部分作用更强
         }
-        if (lumLin < 0.4 && shadows !== 0) {
+        if (lumLin < 0.4 && shadows !== 0)
+        {
             toneScale *= 1 + shadows * 0.5;
         }
-        if (lumLin > 0.6 && highlights !== 0) {
+        if (lumLin > 0.6 && highlights !== 0)
+        {
             toneScale *= 1 + highlights * 0.5;
         }
-        if (lumLin > 0.9 && whites !== 0) {
+        if (lumLin > 0.9 && whites !== 0)
+        {
             toneScale *= 1 + whites * 0.7; // 在极值处作用强烈
         }
-        if (toneScale !== 1) {
+        if (toneScale !== 1)
+        {
             r = Math.max(0, Math.min(255, r * toneScale));
             g = Math.max(0, Math.min(255, g * toneScale));
             b = Math.max(0, Math.min(255, b * toneScale));
         }
 
         // 通过反锐化掩模近似实现的清晰度（局部对比度）
-        if (clarity !== 0 && blurred) {
+        if (clarity !== 0 && blurred)
+        {
             const br = blurred[i];
             const bg = blurred[i + 1];
             const bb = blurred[i + 2];

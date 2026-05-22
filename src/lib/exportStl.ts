@@ -6,14 +6,18 @@ import * as THREE from 'three';
 export async function exportObjectToStlBlob(
     root: THREE.Object3D,
     onProgress?: (p: number) => void
-): Promise<Blob> {
+): Promise<Blob>
+{
     // 1. 收集所有网格
     const meshes: THREE.Mesh[] = [];
     root.updateMatrixWorld(true);
-    root.traverse((obj) => {
-        if ((obj as THREE.Mesh).isMesh) {
+    root.traverse((obj) =>
+    {
+        if ((obj as THREE.Mesh).isMesh)
+        {
             const m = obj as THREE.Mesh;
-            if (m.geometry && m.visible) {
+            if (m.geometry && m.visible)
+            {
                 meshes.push(m);
             }
         }
@@ -23,11 +27,15 @@ export async function exportObjectToStlBlob(
 
     // 2. 计算总大小
     let totalTris = 0;
-    for (const mesh of meshes) {
+    for (const mesh of meshes)
+    {
         const geom = mesh.geometry;
-        if (geom.index) {
+        if (geom.index)
+        {
             totalTris += geom.index.count / 3;
-        } else if (geom.attributes.position) {
+        }
+        else if (geom.attributes.position)
+        {
             totalTris += geom.attributes.position.count / 3;
         }
     }
@@ -36,9 +44,12 @@ export async function exportObjectToStlBlob(
     const triSize = 50;
     const totalBytes = headerBytes + 4 + totalTris * triSize;
     let buffer: ArrayBuffer;
-    try {
+    try
+    {
         buffer = new ArrayBuffer(totalBytes);
-    } catch {
+    }
+    catch
+    {
         throw new Error('Allocation failed for binary STL buffer');
     }
     const view = new DataView(buffer);
@@ -59,7 +70,8 @@ export async function exportObjectToStlBlob(
     const vAC = new THREE.Vector3();
 
     // 3. 写入三角形
-    for (const mesh of meshes) {
+    for (const mesh of meshes)
+    {
         const geom = mesh.geometry;
         const pos = geom.getAttribute('position');
         const index = geom.getIndex();
@@ -70,14 +82,18 @@ export async function exportObjectToStlBlob(
 
         const count = index ? index.count : pos.count;
 
-        for (let i = 0; i < count; i += 3) {
+        for (let i = 0; i < count; i += 3)
+        {
             // 获取索引
             let a, b, c;
-            if (index) {
+            if (index)
+            {
                 a = index.getX(i);
                 b = index.getX(i + 1);
                 c = index.getX(i + 2);
-            } else {
+            }
+            else
+            {
                 a = i;
                 b = i + 1;
                 c = i + 2;
@@ -110,7 +126,8 @@ export async function exportObjectToStlBlob(
             offset += triSize;
 
             processedTris++;
-            if (processedTris % CHUNK === 0 && onProgress) {
+            if (processedTris % CHUNK === 0 && onProgress)
+            {
                 onProgress(processedTris / totalTris);
                 await new Promise((r) => setTimeout(r, 0));
             }

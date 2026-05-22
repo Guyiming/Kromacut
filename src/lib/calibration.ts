@@ -22,7 +22,8 @@ import { estimateTDFromColor } from './colorUtils';
  */
 export type CalibrationRgb = [number, number, number];
 
-export interface CalibrationMeasurement {
+export interface CalibrationMeasurement
+{
     layers: number; // 打印的层数
     rgb: CalibrationRgb; // 测得的 RGB 值 (0-255)
     transmission: CalibrationRgb; // 归一化的透射率 (0-1)
@@ -31,7 +32,8 @@ export interface CalibrationMeasurement {
 /**
  * 耗材的完整校准结果
  */
-export interface CalibrationResult {
+export interface CalibrationResult
+{
     color: string; // 十六进制颜色
     measurements: CalibrationMeasurement[];
     whiteReference?: CalibrationRgb; // 测得的背光 RGB，用于归一化透射率
@@ -45,7 +47,8 @@ export interface CalibrationResult {
 /**
  * 校准向导状态
  */
-export interface CalibrationState {
+export interface CalibrationState
+{
     filamentColor: string;
     measurements: CalibrationMeasurement[];
     whiteReference: CalibrationRgb;
@@ -67,14 +70,16 @@ const WORKING_TD_MAX = 12.0;
 const WORKING_TD_GRID_STEPS = 240;
 const MIN_CHANNEL_CONTRAST = 12;
 
-const clampRgbChannel = (value: number, min: number) => {
+const clampRgbChannel = (value: number, min: number) =>
+{
     if (!Number.isFinite(value)) return min;
     return Math.min(255, Math.max(min, Math.round(value)));
 };
 
 function sanitizeWhiteReference(
     whiteReference: CalibrationRgb = DEFAULT_WHITE_REFERENCE
-): CalibrationRgb {
+): CalibrationRgb
+{
     return [
         clampRgbChannel(whiteReference[0], 1),
         clampRgbChannel(whiteReference[1], 1),
@@ -85,9 +90,11 @@ function sanitizeWhiteReference(
 export function validateWhiteReference(whiteReference: CalibrationRgb): {
     valid: boolean;
     error?: string;
-} {
+}
+{
     const [r, g, b] = whiteReference;
-    if (r < 1 || r > 255 || g < 1 || g > 255 || b < 1 || b > 255) {
+    if (r < 1 || r > 255 || g < 1 || g > 255 || b < 1 || b > 255)
+    {
         return {
             valid: false,
             error: 'White reference RGB values must be between 1 and 255',
@@ -99,7 +106,8 @@ export function validateWhiteReference(whiteReference: CalibrationRgb): {
 export function normalizeCalibrationMeasurements(
     measurements: CalibrationMeasurement[],
     whiteReference: CalibrationRgb = DEFAULT_WHITE_REFERENCE
-): CalibrationMeasurement[] {
+): CalibrationMeasurement[]
+{
     return measurements.map((measurement) => ({
         ...measurement,
         transmission: rgbToTransmission(measurement.rgb, whiteReference),
@@ -111,14 +119,17 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 function getBlendChannelWeights(
     filamentRgb: CalibrationRgb,
     whiteReference: CalibrationRgb
-): CalibrationRgb {
-    const rawWeights: CalibrationRgb = [0, 1, 2].map((channel) => {
+): CalibrationRgb
+{
+    const rawWeights: CalibrationRgb = [0, 1, 2].map((channel) =>
+    {
         const contrast = Math.abs(whiteReference[channel] - filamentRgb[channel]);
         return contrast >= MIN_CHANNEL_CONTRAST ? contrast : contrast * 0.25;
     }) as CalibrationRgb;
     const total = rawWeights.reduce((sum, weight) => sum + weight, 0);
 
-    if (total <= 1e-6) {
+    if (total <= 1e-6)
+    {
         return [1 / 3, 1 / 3, 1 / 3];
     }
 
@@ -130,7 +141,8 @@ function predictWorkingBlendRgb(
     whiteReference: CalibrationRgb,
     td: number,
     thickness: number
-): CalibrationRgb {
+): CalibrationRgb
+{
     const transmission = Math.pow(10, -thickness / td);
     return [
         Math.round(filamentRgb[0] + (whiteReference[0] - filamentRgb[0]) * transmission),
@@ -146,10 +158,12 @@ function evaluateWorkingTdFit(
     whiteReference: CalibrationRgb,
     channelWeights: CalibrationRgb,
     td: number
-): number {
+): number
+{
     let weightedSquaredError = 0;
 
-    for (const measurement of measurements) {
+    for (const measurement of measurements)
+    {
         const thickness = measurement.layers * layerHeight;
         const predicted = predictWorkingBlendRgb(filamentRgb, whiteReference, td, thickness);
 
@@ -167,9 +181,11 @@ function fitWorkingTdFromMeasurements(
     layerHeight: number,
     filamentColor: string,
     whiteReference: CalibrationRgb = DEFAULT_WHITE_REFERENCE
-): { td: number; confidence: number } {
+): { td: number; confidence: number }
+{
     const filamentRgb = hexToRgb(filamentColor);
-    if (!filamentRgb) {
+    if (!filamentRgb)
+    {
         return { td: estimateTDFromColor(filamentColor), confidence: 0.1 };
     }
 
@@ -182,7 +198,8 @@ function fitWorkingTdFromMeasurements(
     let bestTd = heuristicTd;
     let bestError = Number.POSITIVE_INFINITY;
 
-    for (let i = 0; i < WORKING_TD_GRID_STEPS; i++) {
+    for (let i = 0; i < WORKING_TD_GRID_STEPS; i++)
+    {
         const t = i / (WORKING_TD_GRID_STEPS - 1);
         const candidateTd = Math.exp(logMin + (logMax - logMin) * t);
         const error = evaluateWorkingTdFit(
@@ -194,7 +211,8 @@ function fitWorkingTdFromMeasurements(
             candidateTd
         );
 
-        if (error < bestError) {
+        if (error < bestError)
+        {
             bestError = error;
             bestTd = candidateTd;
         }
@@ -203,11 +221,13 @@ function fitWorkingTdFromMeasurements(
     let refineMin = Math.max(WORKING_TD_MIN, bestTd / 1.8);
     let refineMax = Math.min(WORKING_TD_MAX, bestTd * 1.8);
 
-    for (let pass = 0; pass < 2; pass++) {
+    for (let pass = 0; pass < 2; pass++)
+    {
         let passBestTd = bestTd;
         let passBestError = bestError;
 
-        for (let i = 0; i < WORKING_TD_GRID_STEPS; i++) {
+        for (let i = 0; i < WORKING_TD_GRID_STEPS; i++)
+        {
             const t = i / (WORKING_TD_GRID_STEPS - 1);
             const candidateTd = refineMin + (refineMax - refineMin) * t;
             const error = evaluateWorkingTdFit(
@@ -219,7 +239,8 @@ function fitWorkingTdFromMeasurements(
                 candidateTd
             );
 
-            if (error < passBestError) {
+            if (error < passBestError)
+            {
                 passBestError = error;
                 passBestTd = candidateTd;
             }
@@ -285,8 +306,10 @@ export function calculateTDFromMeasurements(
     layerHeight: number,
     whiteReference: CalibrationRgb = DEFAULT_WHITE_REFERENCE,
     filamentColor: string = '#808080'
-): { td: [number, number, number]; tdSingleValue: number; confidence: number } {
-    if (measurements.length < MIN_MEASUREMENTS) {
+): { td: [number, number, number]; tdSingleValue: number; confidence: number }
+{
+    if (measurements.length < MIN_MEASUREMENTS)
+    {
         throw new Error(
             `Need at least ${MIN_MEASUREMENTS} measurements, got ${measurements.length}`
         );
@@ -300,7 +323,8 @@ export function calculateTDFromMeasurements(
     const tdChannels: [number, number, number] = [0, 0, 0];
     const confidences: [number, number, number] = [0, 0, 0];
 
-    for (let channel = 0; channel < 3; channel++) {
+    for (let channel = 0; channel < 3; channel++)
+    {
         const { td, confidence } = fitTDForChannel(sorted, channel, layerHeight);
         tdChannels[channel] = td;
         confidences[channel] = confidence;
@@ -328,24 +352,28 @@ function fitTDForChannel(
     measurements: CalibrationMeasurement[],
     channel: number,
     layerHeight: number
-): { td: number; confidence: number } {
+): { td: number; confidence: number }
+{
     // 从每个测量值计算 TD
     const tdEstimates: Array<{ td: number; thickness: number; transmission: number }> = [];
 
-    for (const measurement of measurements) {
+    for (const measurement of measurements)
+    {
         const transmission = measurement.transmission[channel];
         if (transmission <= 0 || transmission >= 1) continue; // 跳过无效测量
 
         const thickness = measurement.layers * layerHeight;
         const td = -thickness / Math.log10(transmission);
 
-        if (td > 0 && td < 100) {
+        if (td > 0 && td < 100)
+        {
             // 合理性检查：TD 通常应在 0.5-20mm 之间
             tdEstimates.push({ td, thickness, transmission });
         }
     }
 
-    if (tdEstimates.length === 0) {
+    if (tdEstimates.length === 0)
+    {
         // 回退：返回默认 TD 和较低的置信度
         return { td: 2.0, confidence: 0.1 };
     }
@@ -354,7 +382,8 @@ function fitTDForChannel(
     let weightedSum = 0;
     let totalWeight = 0;
 
-    for (const { td, transmission } of tdEstimates) {
+    for (const { td, transmission } of tdEstimates)
+    {
         // 权重函数：在 T=0.5 处达到峰值，在两端下降
         const weight = 1 - Math.abs(transmission - 0.5) * 2; // T=0 或 T=1 时为 0，T=0.5 时为 1
         weightedSum += td * weight;
@@ -383,7 +412,8 @@ function fitTDForChannel(
 export function rgbToTransmission(
     rgb: CalibrationRgb,
     whiteReference: CalibrationRgb = DEFAULT_WHITE_REFERENCE
-): CalibrationRgb {
+): CalibrationRgb
+{
     const reference = sanitizeWhiteReference(whiteReference);
     return [
         Math.max(0, Math.min(1, rgb[0] / reference[0])),
@@ -402,7 +432,8 @@ export function predictTransmission(
     layerHeight: number,
     td: [number, number, number],
     whiteReference: CalibrationRgb = DEFAULT_WHITE_REFERENCE
-): CalibrationRgb {
+): CalibrationRgb
+{
     const thickness = layers * layerHeight;
 
     // 解析耗材颜色
@@ -441,8 +472,10 @@ export function predictTransmission(
 export function computeProfileConfidence(profile: {
     calibration?: CalibrationResult;
     transmissionDistance: number;
-}): number {
-    if (!profile.calibration) {
+}): number
+{
+    if (!profile.calibration)
+    {
         // 无校准数据：基于 TD 值确定置信度
         // TD 越低 = 越适合光刻图 = 置信度越高
         const td = profile.transmissionDistance;
@@ -457,7 +490,8 @@ export function computeProfileConfidence(profile: {
     // 惩罚旧的校准（>6 个月）
     const ageMs = Date.now() - new Date(cal.calibrationDate).getTime();
     const ageMonths = ageMs / (1000 * 60 * 60 * 24 * 30);
-    if (ageMonths > 6) {
+    if (ageMonths > 6)
+    {
         confidence *= Math.max(0.7, 1 - (ageMonths - 6) / 24); // 在 2 年内衰减
     }
 
@@ -471,7 +505,8 @@ export function computeProfileConfidence(profile: {
 /**
  * 获取用于 UI 显示的置信度标签
  */
-export function getConfidenceLabel(confidence: number): string {
+export function getConfidenceLabel(confidence: number): string
+{
     if (confidence >= CONFIDENCE_THRESHOLD_EXCELLENT) return 'Excellent';
     if (confidence >= CONFIDENCE_THRESHOLD_GOOD) return 'Good';
     if (confidence >= 0.5) return 'Fair';
@@ -481,7 +516,8 @@ export function getConfidenceLabel(confidence: number): string {
 /**
  * 获取用于 UI 显示的置信度颜色（Tailwind 类）
  */
-export function getConfidenceColor(confidence: number): string {
+export function getConfidenceColor(confidence: number): string
+{
     if (confidence >= CONFIDENCE_THRESHOLD_EXCELLENT) return 'text-green-600';
     if (confidence >= CONFIDENCE_THRESHOLD_GOOD) return 'text-blue-600';
     if (confidence >= 0.5) return 'text-yellow-600';
@@ -498,18 +534,22 @@ export function getConfidenceColor(confidence: number): string {
 export function validateMeasurement(
     measurement: CalibrationMeasurement,
     whiteReference: CalibrationRgb = DEFAULT_WHITE_REFERENCE
-): { valid: boolean; error?: string } {
-    if (measurement.layers < 1 || measurement.layers > 50) {
+): { valid: boolean; error?: string }
+{
+    if (measurement.layers < 1 || measurement.layers > 50)
+    {
         return { valid: false, error: 'Layer count must be between 1 and 50' };
     }
 
     const [r, g, b] = measurement.rgb;
-    if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) {
+    if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255)
+    {
         return { valid: false, error: 'RGB values must be between 0 and 255' };
     }
 
     const [tR, tG, tB] = rgbToTransmission(measurement.rgb, whiteReference);
-    if (tR < 0 || tR > 1 || tG < 0 || tG > 1 || tB < 0 || tB > 1) {
+    if (tR < 0 || tR > 1 || tG < 0 || tG > 1 || tB < 0 || tB > 1)
+    {
         return { valid: false, error: 'Transmission values must be between 0 and 1' };
     }
 
@@ -525,13 +565,16 @@ export function canCalculateTD(
 ): {
     ready: boolean;
     reason?: string;
-} {
+}
+{
     const whiteReferenceValidation = validateWhiteReference(whiteReference);
-    if (!whiteReferenceValidation.valid) {
+    if (!whiteReferenceValidation.valid)
+    {
         return { ready: false, reason: whiteReferenceValidation.error };
     }
 
-    if (measurements.length < MIN_MEASUREMENTS) {
+    if (measurements.length < MIN_MEASUREMENTS)
+    {
         return {
             ready: false,
             reason: `Need at least ${MIN_MEASUREMENTS} measurements (have ${measurements.length})`,
@@ -540,14 +583,17 @@ export function canCalculateTD(
 
     // 检查是否有重复的层数
     const layerCounts = new Set(measurements.map((m) => m.layers));
-    if (layerCounts.size < measurements.length) {
+    if (layerCounts.size < measurements.length)
+    {
         return { ready: false, reason: 'Duplicate layer counts detected' };
     }
 
     // 验证每个测量
-    for (const measurement of measurements) {
+    for (const measurement of measurements)
+    {
         const validation = validateMeasurement(measurement, whiteReference);
-        if (!validation.valid) {
+        if (!validation.valid)
+        {
             return { ready: false, reason: validation.error };
         }
     }
@@ -560,7 +606,8 @@ export function canCalculateTD(
  */
 export function getRecommendedLayerCounts(
     existing: CalibrationMeasurement[]
-): { recommended: number[]; measured: number[] } {
+): { recommended: number[]; measured: number[] }
+{
     const measured = existing.map((m) => m.layers);
     const recommended = RECOMMENDED_LAYER_COUNTS.filter((count) => !measured.includes(count));
     return { recommended, measured };
@@ -573,7 +620,8 @@ export function getRecommendedLayerCounts(
 /**
  * 将十六进制颜色解析为 RGB
  */
-function hexToRgb(hex: string): [number, number, number] | null {
+function hexToRgb(hex: string): [number, number, number] | null
+{
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result
         ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
@@ -583,7 +631,8 @@ function hexToRgb(hex: string): [number, number, number] | null {
 /**
  * 为用户生成校准说明
  */
-export function getCalibrationInstructions(layerHeight: number): string[] {
+export function getCalibrationInstructions(layerHeight: number): string[]
+{
     return [
         `Print test patches with ${RECOMMENDED_LAYER_COUNTS.join(', ')} layers each.`,
         `Use your filament color with 100% infill.`,
@@ -599,14 +648,16 @@ export function getCalibrationInstructions(layerHeight: number): string[] {
 /**
  * 将校准结果导出为 JSON 以便分享
  */
-export function exportCalibration(result: CalibrationResult): string {
+export function exportCalibration(result: CalibrationResult): string
+{
     return JSON.stringify(result, null, 2);
 }
 
 /**
  * 从 JSON 导入校准结果
  */
-export function importCalibration(json: string): CalibrationResult {
+export function importCalibration(json: string): CalibrationResult
+{
     const parsed = JSON.parse(json);
 
     // 验证
@@ -616,16 +667,19 @@ export function importCalibration(json: string): CalibrationResult {
         !Array.isArray(parsed.td) ||
         typeof parsed.tdSingleValue !== 'number' ||
         typeof parsed.confidence !== 'number'
-    ) {
+    )
+    {
         throw new Error('Invalid calibration data format');
     }
 
-    if (parsed.whiteReference !== undefined) {
+    if (parsed.whiteReference !== undefined)
+    {
         if (
             !Array.isArray(parsed.whiteReference) ||
             parsed.whiteReference.length !== 3 ||
             !validateWhiteReference(parsed.whiteReference as CalibrationRgb).valid
-        ) {
+        )
+        {
             throw new Error('Invalid calibration white reference');
         }
     }

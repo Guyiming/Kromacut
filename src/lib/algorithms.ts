@@ -2,7 +2,8 @@
 // 每个函数都在 ImageData 实例上操作，并返回修改后的 ImageData。
 
 /** 所有异步算法函数接受的选项。 */
-export interface AlgoOptions {
+export interface AlgoOptions
+{
     /** 使用 0..1 之间的值调用，表示算法内子步骤的进度。 */
     onProgress?: (value: number) => void;
 }
@@ -12,11 +13,14 @@ export interface AlgoOptions {
  * 如果是，则通过 setTimeout(0) 让出给事件循环，
  * 这样浏览器可以绘制帧，进度条也可以更新。
  */
-function createYielder(intervalMs = 30) {
+function createYielder(intervalMs = 30)
+{
     let last = performance.now();
-    return async () => {
+    return async () =>
+    {
         const now = performance.now();
-        if (now - last >= intervalMs) {
+        if (now - last >= intervalMs)
+        {
             await new Promise<void>((r) => setTimeout(r, 0));
             last = performance.now();
         }
@@ -27,17 +31,21 @@ function createYielder(intervalMs = 30) {
  * 异步像素循环辅助函数：构建唯一不透明颜色的直方图。
  * 周期性让出以保持 UI 响应。
  */
-async function buildHistogramAsync(d: Uint8ClampedArray, onProgress?: (frac: number) => void) {
+async function buildHistogramAsync(d: Uint8ClampedArray, onProgress?: (frac: number) => void)
+{
     const maybeYield = createYielder();
     const map = new Map<number, number>();
     const total = d.length / 4;
-    for (let i = 0; i < d.length; i += 4) {
+    for (let i = 0; i < d.length; i += 4)
+    {
         const a = d[i + 3];
-        if (a !== 0) {
+        if (a !== 0)
+        {
             const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
             map.set(key, (map.get(key) || 0) + 1);
         }
-        if ((i & 0x3fffc) === 0) {
+        if ((i & 0x3fffc) === 0)
+        {
             // 每约 65k 个像素
             onProgress?.(i / 4 / total);
             await maybeYield();
@@ -55,21 +63,26 @@ async function applyLookupAsync(
     d: Uint8ClampedArray,
     lookup: Map<number, [number, number, number]>,
     onProgress?: (frac: number) => void
-) {
+)
+{
     const maybeYield = createYielder();
     const total = d.length / 4;
-    for (let i = 0; i < d.length; i += 4) {
+    for (let i = 0; i < d.length; i += 4)
+    {
         const a = d[i + 3];
-        if (a !== 0) {
+        if (a !== 0)
+        {
             const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
             const v = lookup.get(key);
-            if (v) {
+            if (v)
+            {
                 d[i] = v[0];
                 d[i + 1] = v[1];
                 d[i + 2] = v[2];
             }
         }
-        if ((i & 0x3fffc) === 0) {
+        if ((i & 0x3fffc) === 0)
+        {
             onProgress?.(i / 4 / total);
             await maybeYield();
         }
@@ -78,9 +91,11 @@ async function applyLookupAsync(
 }
 
 /** 将直方图 Map 转换为所有算法使用的条目数组。 */
-function histogramToEntries(map: Map<number, number>) {
+function histogramToEntries(map: Map<number, number>)
+{
     const entries: { key: number; r: number; g: number; b: number; count: number }[] = [];
-    map.forEach((count, key) => {
+    map.forEach((count, key) =>
+    {
         entries.push({
             key,
             r: (key >> 16) & 0xff,
@@ -96,7 +111,8 @@ export async function posterizeImageData(
     data: ImageData,
     weight: number,
     opts?: AlgoOptions
-): Promise<ImageData> {
+): Promise<ImageData>
+{
     const d = data.data;
     const maybeYield = createYielder();
     // 清理并钳制
@@ -105,17 +121,20 @@ export async function posterizeImageData(
     // 对于非常小的调色板，量化亮度（灰度）通常比拆分颜色通道
     // 在视觉上更令人愉悦，因为后者可能产生强烈的色调
     // （例如 2 色时出现的红色轮廓）。
-    if (weight <= 4) {
+    if (weight <= 4)
+    {
         const levels = weight;
         const steps = Math.max(0, levels - 1);
         const scale = steps > 0 ? 255 / steps : 0;
         const total = d.length / 4;
-        for (let i = 0; i < d.length; i += 4) {
+        for (let i = 0; i < d.length; i += 4)
+        {
             const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
             const idx = steps > 0 ? Math.round((l * steps) / 255) : 0;
             const v = Math.round(idx * scale);
             d[i] = d[i + 1] = d[i + 2] = v;
-            if ((i & 0x3fffc) === 0) {
+            if ((i & 0x3fffc) === 0)
+            {
                 opts?.onProgress?.((0.5 * (i / 4)) / total);
                 await maybeYield();
             }
@@ -131,14 +150,20 @@ export async function posterizeImageData(
     let b = r;
 
     // 在不使乘积超过 weight 的前提下，扩展最小的通道
-    while (r * g * b < weight) {
-        if (r <= g && r <= b) {
+    while (r * g * b < weight)
+    {
+        if (r <= g && r <= b)
+        {
             if ((r + 1) * g * b <= weight) r++;
             else break;
-        } else if (g <= r && g <= b) {
+        }
+        else if (g <= r && g <= b)
+        {
             if (r * (g + 1) * b <= weight) g++;
             else break;
-        } else {
+        }
+        else
+        {
             if (r * g * (b + 1) <= weight) b++;
             else break;
         }
@@ -149,21 +174,27 @@ export async function posterizeImageData(
     const scales = stepsArr.map((s) => (s > 0 ? 255 / s : 0));
 
     const total = d.length / 4;
-    for (let i = 0; i < d.length; i += 4) {
+    for (let i = 0; i < d.length; i += 4)
+    {
         // 独立量化每个通道；如果某个通道只有一个级别
         // (steps === 0)，则映射到中间值 (128)，避免将整体颜色推向黑色。
-        for (let c = 0; c < 3; c++) {
+        for (let c = 0; c < 3; c++)
+        {
             const val = d[i + c];
             const steps = stepsArr[c];
-            if (steps === 0) {
+            if (steps === 0)
+            {
                 d[i + c] = 128;
-            } else {
+            }
+            else
+            {
                 const idx = Math.round((val * steps) / 255);
                 d[i + c] = Math.round(idx * scales[c]);
             }
         }
         // 不修改 alpha 通道
-        if ((i & 0x3fffc) === 0) {
+        if ((i & 0x3fffc) === 0)
+        {
             opts?.onProgress?.((0.5 * (i / 4)) / total);
             await maybeYield();
         }
@@ -181,7 +212,8 @@ export async function medianCutImageData(
     data: ImageData,
     weight: number,
     opts?: AlgoOptions
-): Promise<ImageData> {
+): Promise<ImageData>
+{
     const d = data.data;
     weight = Math.max(2, Math.min(256, Math.floor(weight)));
 
@@ -190,7 +222,8 @@ export async function medianCutImageData(
 
     const entries = histogramToEntries(map);
 
-    if (entries.length <= weight) {
+    if (entries.length <= weight)
+    {
         return enforcePaletteSizeAsync(data, weight, (f) => opts?.onProgress?.(0.2 + f * 0.8));
     }
 
@@ -207,7 +240,8 @@ export async function medianCutImageData(
         count: number;
     };
 
-    const makeBox = (items: typeof entries): Box => {
+    const makeBox = (items: typeof entries): Box =>
+    {
         let rMin = 255,
             rMax = 0,
             gMin = 255,
@@ -215,7 +249,8 @@ export async function medianCutImageData(
             bMin = 255,
             bMax = 0,
             count = 0;
-        for (const it of items) {
+        for (const it of items)
+        {
             if (it.r < rMin) rMin = it.r;
             if (it.r > rMax) rMax = it.r;
             if (it.g < gMin) gMin = it.g;
@@ -230,17 +265,20 @@ export async function medianCutImageData(
     // 从一个包含所有条目的盒子开始
     const boxes: Box[] = [makeBox(entries)];
 
-    while (boxes.length < weight) {
+    while (boxes.length < weight)
+    {
         // 选择颜色范围最大的盒子（按最大通道跨度）
         let idx = -1;
         let maxRange = -1;
-        for (let i = 0; i < boxes.length; i++) {
+        for (let i = 0; i < boxes.length; i++)
+        {
             const b = boxes[i];
             const rRange = b.rMax - b.rMin;
             const gRange = b.gMax - b.gMin;
             const bRange = b.bMax - b.bMin;
             const span = Math.max(rRange, gRange, bRange);
-            if (span > maxRange && b.items.length > 1) {
+            if (span > maxRange && b.items.length > 1)
+            {
                 maxRange = span;
                 idx = i;
             }
@@ -266,9 +304,11 @@ export async function medianCutImageData(
         const total = box.count;
         let acc = 0;
         let splitIndex = 0;
-        for (let i = 0; i < box.items.length; i++) {
+        for (let i = 0; i < box.items.length; i++)
+        {
             acc += box.items[i].count;
-            if (acc >= total / 2) {
+            if (acc >= total / 2)
+            {
                 splitIndex = i;
                 break;
             }
@@ -289,12 +329,14 @@ export async function medianCutImageData(
 
     // 计算调色板（每个盒子的加权平均值）并构建查找表
     const lookup = new Map<number, [number, number, number]>();
-    for (const box of boxes) {
+    for (const box of boxes)
+    {
         let rSum = 0,
             gSum = 0,
             bSum = 0,
             cnt = 0;
-        for (const it of box.items) {
+        for (const it of box.items)
+        {
             rSum += it.r * it.count;
             gSum += it.g * it.count;
             bSum += it.b * it.count;
@@ -303,7 +345,8 @@ export async function medianCutImageData(
         const rr = cnt ? Math.round(rSum / cnt) : 0;
         const gg = cnt ? Math.round(gSum / cnt) : 0;
         const bb = cnt ? Math.round(bSum / cnt) : 0;
-        for (const it of box.items) {
+        for (const it of box.items)
+        {
             lookup.set(it.key, [rr, gg, bb]);
         }
     }
@@ -325,7 +368,8 @@ export async function kmeansImageData(
     data: ImageData,
     weight: number,
     opts?: AlgoOptions
-): Promise<ImageData> {
+): Promise<ImageData>
+{
     const d = data.data;
     weight = Math.max(2, Math.min(256, Math.floor(weight)));
 
@@ -341,7 +385,8 @@ export async function kmeansImageData(
     const dist2 = (
         a: { r: number; g: number; b: number },
         b: { r: number; g: number; b: number }
-    ) => {
+    ) =>
+    {
         const dr = a.r - b.r;
         const dg = a.g - b.g;
         const db = a.b - b.b;
@@ -354,9 +399,11 @@ export async function kmeansImageData(
     let totalCount = 0;
     for (const e of entries) totalCount += e.count;
     let r = Math.random() * totalCount;
-    for (const e of entries) {
+    for (const e of entries)
+    {
         r -= e.count;
-        if (r <= 0) {
+        if (r <= 0)
+        {
             centroids.push({ r: e.r, g: e.g, b: e.b });
             break;
         }
@@ -364,13 +411,16 @@ export async function kmeansImageData(
     if (centroids.length === 0)
         centroids.push({ r: entries[0].r, g: entries[0].g, b: entries[0].b });
 
-    while (centroids.length < weight) {
+    while (centroids.length < weight)
+    {
         // 计算每个条目到最近质心的 D^2
         let sum = 0;
         const dists: number[] = new Array(entries.length);
-        for (let i = 0; i < entries.length; i++) {
+        for (let i = 0; i < entries.length; i++)
+        {
             let best = Infinity;
-            for (const c of centroids) {
+            for (const c of centroids)
+            {
                 const v = dist2(entries[i], c);
                 if (v < best) best = v;
             }
@@ -381,7 +431,8 @@ export async function kmeansImageData(
         // 按距离权重选择新的质心
         let pick = Math.random() * sum;
         let idx = 0;
-        for (; idx < entries.length; idx++) {
+        for (; idx < entries.length; idx++)
+        {
             pick -= dists[idx];
             if (pick <= 0) break;
         }
@@ -396,20 +447,25 @@ export async function kmeansImageData(
     // 迭代 k-means（加权）-- 限制迭代次数以提高速度
     const maxIter = 8;
     const assignments = new Array(entries.length).fill(-1);
-    for (let iter = 0; iter < maxIter; iter++) {
+    for (let iter = 0; iter < maxIter; iter++)
+    {
         let changed = false;
         // 分配
-        for (let i = 0; i < entries.length; i++) {
+        for (let i = 0; i < entries.length; i++)
+        {
             let best = -1;
             let bestDist = Infinity;
-            for (let c = 0; c < centroids.length; c++) {
+            for (let c = 0; c < centroids.length; c++)
+            {
                 const v = dist2(entries[i], centroids[c]);
-                if (v < bestDist) {
+                if (v < bestDist)
+                {
                     bestDist = v;
                     best = c;
                 }
             }
-            if (assignments[i] !== best) {
+            if (assignments[i] !== best)
+            {
                 assignments[i] = best;
                 changed = true;
             }
@@ -421,7 +477,8 @@ export async function kmeansImageData(
             b: 0,
             w: 0,
         }));
-        for (let i = 0; i < entries.length; i++) {
+        for (let i = 0; i < entries.length; i++)
+        {
             const a = assignments[i];
             const e = entries[i];
             sums[a].r += e.r * e.count;
@@ -429,12 +486,16 @@ export async function kmeansImageData(
             sums[a].b += e.b * e.count;
             sums[a].w += e.count;
         }
-        for (let c = 0; c < centroids.length; c++) {
-            if (sums[c].w === 0) {
+        for (let c = 0; c < centroids.length; c++)
+        {
+            if (sums[c].w === 0)
+            {
                 // 用一个随机条目重新种子化空的质心
                 const pick = entries[Math.floor(Math.random() * entries.length)];
                 centroids[c] = { r: pick.r, g: pick.g, b: pick.b };
-            } else {
+            }
+            else
+            {
                 centroids[c] = {
                     r: Math.round(sums[c].r / sums[c].w),
                     g: Math.round(sums[c].g / sums[c].w),
@@ -447,12 +508,15 @@ export async function kmeansImageData(
 
     // 构建查找表：将原始颜色映射到最近的质心
     const lookup = new Map<number, [number, number, number]>();
-    for (let i = 0; i < entries.length; i++) {
+    for (let i = 0; i < entries.length; i++)
+    {
         let best = -1;
         let bestDist = Infinity;
-        for (let c = 0; c < centroids.length; c++) {
+        for (let c = 0; c < centroids.length; c++)
+        {
             const v = dist2(entries[i], centroids[c]);
-            if (v < bestDist) {
+            if (v < bestDist)
+            {
                 bestDist = v;
                 best = c;
             }
@@ -478,7 +542,8 @@ export async function octreeImageData(
     data: ImageData,
     weight: number,
     opts?: AlgoOptions
-): Promise<ImageData> {
+): Promise<ImageData>
+{
     const d = data.data;
     weight = Math.max(2, Math.min(256, Math.floor(weight)));
 
@@ -517,10 +582,13 @@ export async function octreeImageData(
     const root = makeNode(0);
     let leafCount = 0;
 
-    const addColor = (r: number, g: number, b: number, count: number) => {
+    const addColor = (r: number, g: number, b: number, count: number) =>
+    {
         let node = root;
-        for (let level = 0; level < MAX_DEPTH; level++) {
-            if (node.isLeaf) {
+        for (let level = 0; level < MAX_DEPTH; level++)
+        {
+            if (node.isLeaf)
+            {
                 node.pixelCount += count;
                 node.rSum += r * count;
                 node.gSum += g * count;
@@ -529,7 +597,8 @@ export async function octreeImageData(
             }
             const shift = 7 - level;
             const idx = (((r >> shift) & 1) << 2) | (((g >> shift) & 1) << 1) | ((b >> shift) & 1);
-            if (!node.children[idx]) {
+            if (!node.children[idx])
+            {
                 const child = makeNode(level + 1);
                 node.children[idx] = child;
                 if (!child.isLeaf) reducible[level + 1].push(child);
@@ -545,19 +614,24 @@ export async function octreeImageData(
 
     for (const e of entries) addColor(e.r, e.g, e.b, e.count);
 
-    const reduceOnce = (): boolean => {
-        for (let level = MAX_DEPTH - 1; level > 0; level--) {
+    const reduceOnce = (): boolean =>
+    {
+        for (let level = MAX_DEPTH - 1; level > 0; level--)
+        {
             const list = reducible[level];
-            while (list.length > 0) {
+            while (list.length > 0)
+            {
                 const node = list.pop() as Node;
                 let rSum = 0,
                     gSum = 0,
                     bSum = 0,
                     cnt = 0,
                     removed = 0;
-                for (let i = 0; i < 8; i++) {
+                for (let i = 0; i < 8; i++)
+                {
                     const ch = node.children[i];
-                    if (ch) {
+                    if (ch)
+                    {
                         rSum += ch.rSum;
                         gSum += ch.gSum;
                         bSum += ch.bSum;
@@ -578,25 +652,31 @@ export async function octreeImageData(
         return false;
     };
 
-    while (leafCount > weight) {
+    while (leafCount > weight)
+    {
         if (!reduceOnce()) break;
     }
 
     const lookup = new Map<number, [number, number, number]>();
 
-    const mapColorToLeaf = (r: number, g: number, b: number): [number, number, number] => {
+    const mapColorToLeaf = (r: number, g: number, b: number): [number, number, number] =>
+    {
         let node = root;
-        for (let level = 0; level < MAX_DEPTH; level++) {
+        for (let level = 0; level < MAX_DEPTH; level++)
+        {
             if (node.isLeaf) break;
             const shift = 7 - level;
             const idx = (((r >> shift) & 1) << 2) | (((g >> shift) & 1) << 1) | ((b >> shift) & 1);
             if (!node.children[idx]) break;
             node = node.children[idx] as Node;
         }
-        const findLeaf = (n: Node): Node => {
+        const findLeaf = (n: Node): Node =>
+        {
             if (n.isLeaf) return n;
-            for (let i = 0; i < 8; i++) {
-                if (n.children[i]) {
+            for (let i = 0; i < 8; i++)
+            {
+                if (n.children[i])
+                {
                     const leaf = findLeaf(n.children[i] as Node);
                     if (leaf) return leaf;
                 }
@@ -604,7 +684,8 @@ export async function octreeImageData(
             return n;
         };
         const leaf = node.isLeaf ? node : findLeaf(node);
-        if (leaf && leaf.pixelCount > 0) {
+        if (leaf && leaf.pixelCount > 0)
+        {
             return [
                 Math.round(leaf.rSum / leaf.pixelCount),
                 Math.round(leaf.gSum / leaf.pixelCount),
@@ -614,7 +695,8 @@ export async function octreeImageData(
         return [0, 0, 0];
     };
 
-    for (const e of entries) {
+    for (const e of entries)
+    {
         lookup.set(e.key, mapColorToLeaf(e.r, e.g, e.b));
     }
 
@@ -644,7 +726,8 @@ export async function wuImageData(
     data: ImageData,
     weight: number,
     opts?: AlgoOptions
-): Promise<ImageData> {
+): Promise<ImageData>
+{
     const d = data.data;
     weight = Math.max(2, Math.min(256, Math.floor(weight)));
 
@@ -670,7 +753,8 @@ export async function wuImageData(
     const m2 = new Float64Array(SIZE);
 
     // 在量化位置 (1..32) 填充直方图。0 作为填充保留
-    for (const e of entries) {
+    for (const e of entries)
+    {
         const ir = (e.r >> 3) + 1;
         const ig = (e.g >> 3) + 1;
         const ib = (e.b >> 3) + 1;
@@ -683,14 +767,17 @@ export async function wuImageData(
     }
 
     // 计算累积矩
-    for (let r = 1; r < SIDE; r++) {
-        for (let g = 1; g < SIDE; g++) {
+    for (let r = 1; r < SIDE; r++)
+    {
+        for (let g = 1; g < SIDE; g++)
+        {
             let rowW = 0,
                 rowR = 0,
                 rowG = 0,
                 rowB = 0,
                 rowM2 = 0;
-            for (let b = 1; b < SIDE; b++) {
+            for (let b = 1; b < SIDE; b++)
+            {
                 const idx = getIndex(r, g, b);
                 rowW += vwt[idx];
                 rowR += vmr[idx];
@@ -716,7 +803,8 @@ export async function wuImageData(
         g1: number,
         b0: number,
         b1: number
-    ) => {
+    ) =>
+    {
         const idx = (r: number, g: number, b: number) => getIndex(r, g, b);
         const a = array[idx(r1, g1, b1)];
         const b_ = array[idx(r1, g1, b0 - 1)];
@@ -767,7 +855,8 @@ export async function wuImageData(
         g1: number;
         b0: number;
         b1: number;
-    }) => {
+    }) =>
+    {
         const w = volumeWeight(box);
         if (w === 0) return 0;
         const m = volumeMoment(box);
@@ -796,7 +885,8 @@ export async function wuImageData(
     });
 
     // 在给定盒子上沿所选轴最大化方差缩减
-    const maximize = (box: Box, dir: 'r' | 'g' | 'b') => {
+    const maximize = (box: Box, dir: 'r' | 'g' | 'b') =>
+    {
         let bestScore = -1;
         let bestPos = -1;
         const wholeR = volumeMoment(box).r;
@@ -804,8 +894,10 @@ export async function wuImageData(
         const wholeB = volumeMoment(box).b;
         const wholeW = volumeWeight(box);
 
-        if (dir === 'r') {
-            for (let i = box.r0; i < box.r1; i++) {
+        if (dir === 'r')
+        {
+            for (let i = box.r0; i < box.r1; i++)
+            {
                 const box1 = {
                     r0: box.r0,
                     r1: i,
@@ -826,13 +918,17 @@ export async function wuImageData(
                 const score =
                     (m1.r * m1.r + m1.g * m1.g + m1.b * m1.b) / w1 +
                     (m2_.r * m2_.r + m2_.g * m2_.g + m2_.b * m2_.b) / w2;
-                if (score > bestScore) {
+                if (score > bestScore)
+                {
                     bestScore = score;
                     bestPos = i;
                 }
             }
-        } else if (dir === 'g') {
-            for (let i = box.g0; i < box.g1; i++) {
+        }
+        else if (dir === 'g')
+        {
+            for (let i = box.g0; i < box.g1; i++)
+            {
                 const box1 = {
                     r0: box.r0,
                     r1: box.r1,
@@ -853,13 +949,17 @@ export async function wuImageData(
                 const score =
                     (m1.r * m1.r + m1.g * m1.g + m1.b * m1.b) / w1 +
                     (m2_.r * m2_.r + m2_.g * m2_.g + m2_.b * m2_.b) / w2;
-                if (score > bestScore) {
+                if (score > bestScore)
+                {
                     bestScore = score;
                     bestPos = i;
                 }
             }
-        } else {
-            for (let i = box.b0; i < box.b1; i++) {
+        }
+        else
+        {
+            for (let i = box.b0; i < box.b1; i++)
+            {
                 const box1 = {
                     r0: box.r0,
                     r1: box.r1,
@@ -880,7 +980,8 @@ export async function wuImageData(
                 const score =
                     (m1.r * m1.r + m1.g * m1.g + m1.b * m1.b) / w1 +
                     (m2_.r * m2_.r + m2_.g * m2_.g + m2_.b * m2_.b) / w2;
-                if (score > bestScore) {
+                if (score > bestScore)
+                {
                     bestScore = score;
                     bestPos = i;
                 }
@@ -892,13 +993,16 @@ export async function wuImageData(
     // 划分盒子
     const boxes: Box[] = [createBox()];
 
-    while (boxes.length < weight) {
+    while (boxes.length < weight)
+    {
         // 寻找方差最大的盒子
         let maxVar = -1;
         let idx = -1;
-        for (let i = 0; i < boxes.length; i++) {
+        for (let i = 0; i < boxes.length; i++)
+        {
             const v = variance(boxes[i]);
-            if (v > maxVar) {
+            if (v > maxVar)
+            {
                 maxVar = v;
                 idx = i;
             }
@@ -918,7 +1022,8 @@ export async function wuImageData(
             { dir: 'b', score: bSplit.score, pos: bSplit.pos },
         ].sort((a, b) => b.score - a.score)[0];
 
-        if (best.score <= 0 || best.pos < 0) {
+        if (best.score <= 0 || best.pos < 0)
+        {
             // 回退到沿最大轴的中位数分割以确保进度
             const rRange = box.r1 - box.r0;
             const gRange = box.g1 - box.g0;
@@ -932,7 +1037,8 @@ export async function wuImageData(
             else mid = Math.floor((box.b0 + box.b1) / 2);
 
             let b1: Box, b2: Box;
-            if (dir === 'r') {
+            if (dir === 'r')
+            {
                 b1 = {
                     r0: box.r0,
                     r1: mid,
@@ -949,7 +1055,9 @@ export async function wuImageData(
                     b0: box.b0,
                     b1: box.b1,
                 };
-            } else if (dir === 'g') {
+            }
+            else if (dir === 'g')
+            {
                 b1 = {
                     r0: box.r0,
                     r1: box.r1,
@@ -966,7 +1074,9 @@ export async function wuImageData(
                     b0: box.b0,
                     b1: box.b1,
                 };
-            } else {
+            }
+            else
+            {
                 b1 = {
                     r0: box.r0,
                     r1: box.r1,
@@ -991,7 +1101,8 @@ export async function wuImageData(
 
         // 通过分割创建两个新盒子
         let box1: Box, box2: Box;
-        if (best.dir === 'r') {
+        if (best.dir === 'r')
+        {
             box1 = {
                 r0: box.r0,
                 r1: best.pos,
@@ -1008,7 +1119,9 @@ export async function wuImageData(
                 b0: box.b0,
                 b1: box.b1,
             };
-        } else if (best.dir === 'g') {
+        }
+        else if (best.dir === 'g')
+        {
             box1 = {
                 r0: box.r0,
                 r1: box.r1,
@@ -1025,7 +1138,9 @@ export async function wuImageData(
                 b0: box.b0,
                 b1: box.b1,
             };
-        } else {
+        }
+        else
+        {
             box1 = {
                 r0: box.r0,
                 r1: box.r1,
@@ -1049,7 +1164,8 @@ export async function wuImageData(
     }
 
     // 计算调色板（每个盒子中的平均颜色）
-    const palette: [number, number, number][] = boxes.map((b) => {
+    const palette: [number, number, number][] = boxes.map((b) =>
+    {
         const w = volumeWeight(b);
         if (w === 0) return [0, 0, 0];
         const m = volumeMoment(b);
@@ -1058,16 +1174,19 @@ export async function wuImageData(
 
     // 通过定位哪个盒子包含其量化坐标，构建从原始颜色到调色板颜色的查找表
     const lookup = new Map<number, [number, number, number]>();
-    for (let pi = 0; pi < palette.length; pi++) {
+    for (let pi = 0; pi < palette.length; pi++)
+    {
         // 此处不需要；我们将逐个条目检查盒子
     }
 
-    for (const e of entries) {
+    for (const e of entries)
+    {
         const ir = (e.r >> 3) + 1;
         const ig = (e.g >> 3) + 1;
         const ib = (e.b >> 3) + 1;
         let found = false;
-        for (let bi = 0; bi < boxes.length; bi++) {
+        for (let bi = 0; bi < boxes.length; bi++)
+        {
             const box = boxes[bi];
             if (
                 ir >= box.r0 &&
@@ -1076,7 +1195,8 @@ export async function wuImageData(
                 ig <= box.g1 &&
                 ib >= box.b0 &&
                 ib <= box.b1
-            ) {
+            )
+            {
                 lookup.set(e.key, palette[bi]);
                 found = true;
                 break;
@@ -1098,13 +1218,15 @@ export async function wuImageData(
  * 后处理：合并最近的调色板颜色，直到调色板长度为 `target`。
  * 在提供的 ImageData 上原地操作并返回。
  */
-export function enforcePaletteSize(data: ImageData, target: number): ImageData {
+export function enforcePaletteSize(data: ImageData, target: number): ImageData
+{
     target = Math.max(2, Math.min(256, Math.floor(target)));
     const d = data.data;
 
     // 构建唯一颜色的直方图（忽略完全透明的像素）
     const map = new Map<number, number>();
-    for (let i = 0; i < d.length; i += 4) {
+    for (let i = 0; i < d.length; i += 4)
+    {
         if (d[i + 3] === 0) continue;
         const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
         map.set(key, (map.get(key) || 0) + 1);
@@ -1117,7 +1239,8 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
         b: number;
         count: number;
     }[] = [];
-    map.forEach((count, key) => {
+    map.forEach((count, key) =>
+    {
         entries.push({
             key,
             r: (key >> 16) & 0xff,
@@ -1134,7 +1257,8 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
     const dist2 = (
         a: { r: number; g: number; b: number },
         b: { r: number; g: number; b: number }
-    ) => {
+    ) =>
+    {
         const dr = a.r - b.r;
         const dg = a.g - b.g;
         const db = a.b - b.b;
@@ -1144,14 +1268,18 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
     // 我们将在一个可变的调色板条目数组上操作
     const palette = entries.slice();
 
-    while (palette.length > target) {
+    while (palette.length > target)
+    {
         let bestI = 0,
             bestJ = 1;
         let bestDist = Infinity;
-        for (let i = 0; i < palette.length; i++) {
-            for (let j = i + 1; j < palette.length; j++) {
+        for (let i = 0; i < palette.length; i++)
+        {
+            for (let j = i + 1; j < palette.length; j++)
+            {
                 const d2 = dist2(palette[i], palette[j]);
-                if (d2 < bestDist) {
+                if (d2 < bestDist)
+                {
                     bestDist = d2;
                     bestI = i;
                     bestJ = j;
@@ -1173,10 +1301,13 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
             count: wSum,
         };
         // 用合并后的项替换较早的索引并删除另一个
-        if (bestI < bestJ) {
+        if (bestI < bestJ)
+        {
             palette.splice(bestJ, 1);
             palette.splice(bestI, 1, merged);
-        } else {
+        }
+        else
+        {
             palette.splice(bestI, 1);
             palette.splice(bestJ, 1, merged);
         }
@@ -1185,7 +1316,8 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
     // 构建从原始颜色到（合并后）最近调色板颜色的映射
     const paletteColors = palette.map((p) => ({ r: p.r, g: p.g, b: p.b }));
     const lookup = new Map<number, [number, number, number]>();
-    const paletteDist = (r: number, g: number, b: number, idx: number) => {
+    const paletteDist = (r: number, g: number, b: number, idx: number) =>
+    {
         const p = paletteColors[idx];
         const dr = r - p.r;
         const dg = g - p.g;
@@ -1193,12 +1325,15 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
         return dr * dr + dg * dg + db * db;
     };
     // 对每个唯一的原始颜色，找到合并后最近的调色板颜色
-    for (const e of entries) {
+    for (const e of entries)
+    {
         let best = 0;
         let bestD = Infinity;
-        for (let i = 0; i < paletteColors.length; i++) {
+        for (let i = 0; i < paletteColors.length; i++)
+        {
             const d2 = paletteDist(e.r, e.g, e.b, i);
-            if (d2 < bestD) {
+            if (d2 < bestD)
+            {
                 bestD = d2;
                 best = i;
             }
@@ -1208,10 +1343,12 @@ export function enforcePaletteSize(data: ImageData, target: number): ImageData {
     }
 
     // 使用查找表对像素进行原地重映射
-    for (let i = 0; i < d.length; i += 4) {
+    for (let i = 0; i < d.length; i += 4)
+    {
         const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
         const v = lookup.get(key);
-        if (v) {
+        if (v)
+        {
             d[i] = v[0];
             d[i + 1] = v[1];
             d[i + 2] = v[2];
@@ -1231,7 +1368,8 @@ export async function enforcePaletteSizeAsync(
     data: ImageData,
     target: number,
     onProgress?: (value: number) => void
-): Promise<ImageData> {
+): Promise<ImageData>
+{
     target = Math.max(2, Math.min(256, Math.floor(target)));
     const d = data.data;
 
@@ -1240,7 +1378,8 @@ export async function enforcePaletteSizeAsync(
     const entries = histogramToEntries(map);
 
     // 如果唯一颜色数已经 <= target，则保持不变（用户允许更少的颜色）
-    if (entries.length <= target) {
+    if (entries.length <= target)
+    {
         onProgress?.(1);
         return data;
     }
@@ -1251,7 +1390,8 @@ export async function enforcePaletteSizeAsync(
     const dist2 = (
         a: { r: number; g: number; b: number },
         b: { r: number; g: number; b: number }
-    ) => {
+    ) =>
+    {
         const dr = a.r - b.r;
         const dg = a.g - b.g;
         const db = a.b - b.b;
@@ -1264,14 +1404,18 @@ export async function enforcePaletteSizeAsync(
     const maybeYield = createYielder();
     let mergesDone = 0;
 
-    while (palette.length > target) {
+    while (palette.length > target)
+    {
         let bestI = 0,
             bestJ = 1;
         let bestDist = Infinity;
-        for (let i = 0; i < palette.length; i++) {
-            for (let j = i + 1; j < palette.length; j++) {
+        for (let i = 0; i < palette.length; i++)
+        {
+            for (let j = i + 1; j < palette.length; j++)
+            {
                 const d2 = dist2(palette[i], palette[j]);
-                if (d2 < bestDist) {
+                if (d2 < bestDist)
+                {
                     bestDist = d2;
                     bestI = i;
                     bestJ = j;
@@ -1291,15 +1435,19 @@ export async function enforcePaletteSizeAsync(
             b: nb,
             count: wSum,
         };
-        if (bestI < bestJ) {
+        if (bestI < bestJ)
+        {
             palette.splice(bestJ, 1);
             palette.splice(bestI, 1, merged);
-        } else {
+        }
+        else
+        {
             palette.splice(bestI, 1);
             palette.splice(bestJ, 1, merged);
         }
         mergesDone++;
-        if (mergesDone % 4 === 0 && mergesNeeded > 0) {
+        if (mergesDone % 4 === 0 && mergesNeeded > 0)
+        {
             onProgress?.(0.3 + (mergesDone / mergesNeeded) * 0.3);
             await maybeYield();
         }
@@ -1310,19 +1458,23 @@ export async function enforcePaletteSizeAsync(
     // 构建从原始颜色到（合并后）最近调色板颜色的映射
     const paletteColors = palette.map((p) => ({ r: p.r, g: p.g, b: p.b }));
     const lookup = new Map<number, [number, number, number]>();
-    const paletteDist = (r: number, g: number, b: number, idx: number) => {
+    const paletteDist = (r: number, g: number, b: number, idx: number) =>
+    {
         const p = paletteColors[idx];
         const dr = r - p.r;
         const dg = g - p.g;
         const db = b - p.b;
         return dr * dr + dg * dg + db * db;
     };
-    for (const e of entries) {
+    for (const e of entries)
+    {
         let best = 0;
         let bestD = Infinity;
-        for (let i = 0; i < paletteColors.length; i++) {
+        for (let i = 0; i < paletteColors.length; i++)
+        {
             const d2 = paletteDist(e.r, e.g, e.b, i);
-            if (d2 < bestD) {
+            if (d2 < bestD)
+            {
                 bestD = d2;
                 best = i;
             }
@@ -1334,16 +1486,19 @@ export async function enforcePaletteSizeAsync(
     // 使用查找表对像素进行原地重映射（带让出）
     const applyMaybeYield = createYielder();
     const total = d.length / 4;
-    for (let i = 0; i < d.length; i += 4) {
+    for (let i = 0; i < d.length; i += 4)
+    {
         const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
         const v = lookup.get(key);
-        if (v) {
+        if (v)
+        {
             d[i] = v[0];
             d[i + 1] = v[1];
             d[i + 2] = v[2];
         }
         if (d[i + 3] > 0 && d[i + 3] < 255) d[i + 3] = 255;
-        if ((i & 0x3fffc) === 0) {
+        if ((i & 0x3fffc) === 0)
+        {
             onProgress?.(0.6 + (i / 4 / total) * 0.4);
             await applyMaybeYield();
         }
@@ -1361,16 +1516,19 @@ export async function mapImageToPalette(
     data: ImageData,
     palette: string[],
     opts?: AlgoOptions
-): Promise<ImageData> {
+): Promise<ImageData>
+{
     // window 调试增强（安全访问）
     const d = data.data;
     if (!palette || palette.length === 0) return data;
 
     // --- 解析辅助函数 ---
     const clamp = (v: number, a = 0, b = 255) => (v < a ? a : v > b ? b : v);
-    const parseHex = (s: string): [number, number, number] => {
+    const parseHex = (s: string): [number, number, number] =>
+    {
         const raw = s.replace(/^#/, '').trim();
-        if (raw.length === 3) {
+        if (raw.length === 3)
+        {
             const r = parseInt(raw[0] + raw[0], 16);
             const g = parseInt(raw[1] + raw[1], 16);
             const b = parseInt(raw[2] + raw[2], 16);
@@ -1382,7 +1540,8 @@ export async function mapImageToPalette(
             parseInt(raw.slice(4, 6), 16) || 0,
         ];
     };
-    const hslToRgb = (h: number, s: number, l: number): [number, number, number] => {
+    const hslToRgb = (h: number, s: number, l: number): [number, number, number] =>
+    {
         const c = (1 - Math.abs(2 * l - 1)) * s;
         const hh = ((h % 360) + 360) % 360;
         const x = c * (1 - Math.abs(((hh / 60) % 2) - 1));
@@ -1402,7 +1561,8 @@ export async function mapImageToPalette(
             Math.round(clamp((b1 + m) * 255)),
         ];
     };
-    const parseColor = (s: string): [number, number, number] => {
+    const parseColor = (s: string): [number, number, number] =>
+    {
         const str = s.trim();
         if (str.startsWith('#') || /^[0-9A-Fa-f]{3,6}$/.test(str)) return parseHex(str);
         const hsl = str.match(
@@ -1412,7 +1572,8 @@ export async function mapImageToPalette(
         const rgb = str.match(
             /rgba?\(\s*([\d.]+)\s*(?:,|\s)\s*([\d.]+)%?\s*(?:,|\s)\s*([\d.]+)%?/i
         );
-        if (rgb) {
+        if (rgb)
+        {
             const hasPct = /%/.test(str);
             if (hasPct)
                 return [
@@ -1429,7 +1590,8 @@ export async function mapImageToPalette(
         return [0, 0, 0];
     };
     // sRGB -> Lab (D65)
-    const srgbToLab = (r: number, g: number, b: number) => {
+    const srgbToLab = (r: number, g: number, b: number) =>
+    {
         let R = r / 255,
             G = g / 255,
             B = b / 255;
@@ -1459,7 +1621,8 @@ export async function mapImageToPalette(
     // 缓存原始颜色 -> 最近的调色板颜色，避免重复的 Lab 距离计算
     const cache = new Map<number, [number, number, number]>();
     const labCache = new Map<number, [number, number, number]>();
-    const getLab = (key: number) => {
+    const getLab = (key: number) =>
+    {
         let v = labCache.get(key);
         if (v) return v;
         const r = (key >> 16) & 0xff;
@@ -1473,25 +1636,32 @@ export async function mapImageToPalette(
     const maybeYield = createYielder();
     const total = d.length / 4;
 
-    for (let i = 0; i < d.length; i += 4) {
+    for (let i = 0; i < d.length; i += 4)
+    {
         const a = d[i + 3];
         if (a === 0) continue; // 完全透明的像素保持原样
         const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
         let mapped = cache.get(key);
-        if (!mapped) {
+        if (!mapped)
+        {
             // 如果已经精确等于某个调色板颜色，则直接复用
-            if (allowed.has(key)) {
+            if (allowed.has(key))
+            {
                 mapped = [(key >> 16) & 0xff, (key >> 8) & 0xff, key & 0xff];
-            } else {
+            }
+            else
+            {
                 const lab = getLab(key);
                 let best = 0;
                 let bestD = Infinity;
-                for (let pi = 0; pi < palLab.length; pi++) {
+                for (let pi = 0; pi < palLab.length; pi++)
+                {
                     const dl = lab[0] - palLab[pi][0];
                     const da = lab[1] - palLab[pi][1];
                     const db = lab[2] - palLab[pi][2];
                     const d2 = dl * dl + da * da + db * db;
-                    if (d2 < bestD) {
+                    if (d2 < bestD)
+                    {
                         bestD = d2;
                         best = pi;
                     }
@@ -1504,7 +1674,8 @@ export async function mapImageToPalette(
         d[i + 1] = mapped[1];
         d[i + 2] = mapped[2];
         if (a < 255) d[i + 3] = 255; // 规范化任何部分透明度
-        if ((i & 0x3fffc) === 0) {
+        if ((i & 0x3fffc) === 0)
+        {
             opts?.onProgress?.(i / 4 / total);
             await maybeYield();
         }

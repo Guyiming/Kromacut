@@ -1,6 +1,7 @@
 import type { Filament } from '@/types';
 
-export interface AutoPaintProfile {
+export interface AutoPaintProfile
+{
     id: string;
     name: string;
     version: number;
@@ -14,8 +15,10 @@ export const CURRENT_PROFILE_VERSION = 1;
 const PROFILES_STORAGE_KEY = 'kromacut.autopaint.profiles';
 const LAST_PROFILE_KEY = 'kromacut.autopaint.lastProfileId';
 
-export function loadProfiles(): AutoPaintProfile[] {
-    try {
+export function loadProfiles(): AutoPaintProfile[]
+{
+    try
+    {
         const raw = localStorage.getItem(PROFILES_STORAGE_KEY);
         if (!raw) return [];
         const parsed = JSON.parse(raw) as AutoPaintProfile[];
@@ -24,40 +27,58 @@ export function loadProfiles(): AutoPaintProfile[] {
             (p) =>
                 typeof p.id === 'string' && typeof p.name === 'string' && Array.isArray(p.filaments)
         );
-    } catch {
+    }
+    catch
+    {
         return [];
     }
 }
 
-export function loadLastProfileId(): string | null {
-    try {
+export function loadLastProfileId(): string | null
+{
+    try
+    {
         return localStorage.getItem(LAST_PROFILE_KEY);
-    } catch {
+    }
+    catch
+    {
         return null;
     }
 }
 
-export function saveLastProfileId(id: string | null) {
-    try {
-        if (id) {
+export function saveLastProfileId(id: string | null)
+{
+    try
+    {
+        if (id)
+        {
             localStorage.setItem(LAST_PROFILE_KEY, id);
-        } else {
+        }
+        else
+        {
             localStorage.removeItem(LAST_PROFILE_KEY);
         }
-    } catch {
+    }
+    catch
+    {
         // 忽略
     }
 }
 
-export function saveProfilesToStorage(profiles: AutoPaintProfile[]) {
-    try {
+export function saveProfilesToStorage(profiles: AutoPaintProfile[])
+{
+    try
+    {
         localStorage.setItem(PROFILES_STORAGE_KEY, JSON.stringify(profiles));
-    } catch {
+    }
+    catch
+    {
         // 忽略存储错误
     }
 }
 
-export function createProfile(name: string, filaments: Filament[]): AutoPaintProfile {
+export function createProfile(name: string, filaments: Filament[]): AutoPaintProfile
+{
     const now = Date.now();
     return {
         id: crypto.randomUUID(),
@@ -73,7 +94,8 @@ export function overwriteProfile(
     profiles: AutoPaintProfile[],
     id: string,
     filaments: Filament[]
-): AutoPaintProfile[] {
+): AutoPaintProfile[]
+{
     return profiles.map((p) =>
         p.id === id
             ? {
@@ -85,7 +107,8 @@ export function overwriteProfile(
     );
 }
 
-export function deleteProfile(profiles: AutoPaintProfile[], id: string): AutoPaintProfile[] {
+export function deleteProfile(profiles: AutoPaintProfile[], id: string): AutoPaintProfile[]
+{
     return profiles.filter((p) => p.id !== id);
 }
 
@@ -93,7 +116,8 @@ export function deleteProfile(profiles: AutoPaintProfile[], id: string): AutoPai
 const filamentCalibrationSignature = (filament: Filament) =>
     JSON.stringify(filament.calibration ?? null);
 
-function filamentsEqual(a: Filament[], b: Filament[]): boolean {
+function filamentsEqual(a: Filament[], b: Filament[]): boolean
+{
     if (a.length !== b.length) return false;
     return a.every(
         (af, i) =>
@@ -105,7 +129,8 @@ function filamentsEqual(a: Filament[], b: Filament[]): boolean {
 }
 
 /** 如果名称已存在，则通过追加数字后缀派生唯一名称。 */
-function deduplicateName(name: string, existing: AutoPaintProfile[]): string {
+function deduplicateName(name: string, existing: AutoPaintProfile[]): string
+{
     const names = new Set(existing.map((p) => p.name));
     if (!names.has(name)) return name;
     let suffix = 2;
@@ -113,7 +138,8 @@ function deduplicateName(name: string, existing: AutoPaintProfile[]): string {
     return `${name} (${suffix})`;
 }
 
-export interface ImportResult {
+export interface ImportResult
+{
     profiles: AutoPaintProfile[];
     imported: AutoPaintProfile[];
     skipped: string[];
@@ -130,7 +156,8 @@ export interface ImportResult {
 export function importProfiles(
     existing: AutoPaintProfile[],
     incoming: AutoPaintProfile[]
-): ImportResult {
+): ImportResult
+{
     const result: ImportResult = {
         profiles: [...existing],
         imported: [],
@@ -139,7 +166,8 @@ export function importProfiles(
         renamed: [],
     };
 
-    for (const raw of incoming) {
+    for (const raw of incoming)
+    {
         // 验证必需字段
         if (!raw || typeof raw.name !== 'string' || !Array.isArray(raw.filaments)) continue;
 
@@ -160,7 +188,8 @@ export function importProfiles(
 
         // 1. ID 匹配 → 覆盖
         const idMatch = result.profiles.findIndex((p) => p.id === profile.id);
-        if (idMatch !== -1) {
+        if (idMatch !== -1)
+        {
             result.profiles[idMatch] = { ...profile, updatedAt: now };
             result.overwritten.push(profile.name);
             result.imported.push(result.profiles[idMatch]);
@@ -171,14 +200,16 @@ export function importProfiles(
         const contentMatch = result.profiles.find((p) =>
             filamentsEqual(p.filaments, validFilaments)
         );
-        if (contentMatch) {
+        if (contentMatch)
+        {
             result.skipped.push(`${profile.name} (matches "${contentMatch.name}")`);
             continue;
         }
 
         // 3. 名称匹配 → 重命名
         const nameMatch = result.profiles.some((p) => p.name === profile.name);
-        if (nameMatch) {
+        if (nameMatch)
+        {
             profile.name = deduplicateName(profile.name, result.profiles);
             result.renamed.push(profile.name);
         }
@@ -194,25 +225,32 @@ export function importProfiles(
  * 将文件的 JSON 内容解析为待导入的配置文件数组。
  * 支持单个配置文件对象和配置文件数组。
  */
-export function parseProfileFile(json: string): AutoPaintProfile[] | null {
-    try {
+export function parseProfileFile(json: string): AutoPaintProfile[] | null
+{
+    try
+    {
         const parsed = JSON.parse(json);
         if (Array.isArray(parsed)) return parsed;
-        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.filaments)) {
+        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.filaments))
+        {
             return [parsed as AutoPaintProfile];
         }
         return null;
-    } catch {
+    }
+    catch
+    {
         return null;
     }
 }
 
 /** 为配置文件构建导出 blob。 */
-export function exportProfileBlob(profile: AutoPaintProfile): Blob {
+export function exportProfileBlob(profile: AutoPaintProfile): Blob
+{
     return new Blob([JSON.stringify(profile, null, 2)], { type: 'application/json' });
 }
 
 /** 清理名称以便用作文件名。 */
-export function profileFileName(name: string): string {
+export function profileFileName(name: string): string
+{
     return `${name.replace(/[^a-zA-Z0-9_-]/g, '_')}.kapp`;
 }

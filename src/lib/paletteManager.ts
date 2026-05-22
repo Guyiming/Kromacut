@@ -10,8 +10,10 @@ const SELECTED_PALETTE_KEY = 'kromacut.palettes.selected';
  * localStorage 辅助函数
  * --------------------------------------------------------------------------- */
 
-export function loadCustomPalettes(): CustomPalette[] {
-    try {
+export function loadCustomPalettes(): CustomPalette[]
+{
+    try
+    {
         const raw = localStorage.getItem(PALETTES_STORAGE_KEY);
         if (!raw) return [];
         const parsed = JSON.parse(raw) as CustomPalette[];
@@ -19,51 +21,76 @@ export function loadCustomPalettes(): CustomPalette[] {
         return parsed.filter(
             (p) => typeof p.id === 'string' && typeof p.name === 'string' && Array.isArray(p.colors)
         );
-    } catch {
+    }
+    catch
+    {
         return [];
     }
 }
 
-export function saveCustomPalettes(palettes: CustomPalette[]) {
-    try {
+export function saveCustomPalettes(palettes: CustomPalette[])
+{
+    try
+    {
         localStorage.setItem(PALETTES_STORAGE_KEY, JSON.stringify(palettes));
-    } catch {
+    }
+    catch
+    {
         // 忽略存储错误
     }
 }
 
-export function loadLastCustomPaletteId(): string | null {
-    try {
+export function loadLastCustomPaletteId(): string | null
+{
+    try
+    {
         return localStorage.getItem(LAST_PALETTE_KEY);
-    } catch {
+    }
+    catch
+    {
         return null;
     }
 }
 
-export function saveLastCustomPaletteId(id: string | null) {
-    try {
-        if (id) {
+export function saveLastCustomPaletteId(id: string | null)
+{
+    try
+    {
+        if (id)
+        {
             localStorage.setItem(LAST_PALETTE_KEY, id);
-        } else {
+        }
+        else
+        {
             localStorage.removeItem(LAST_PALETTE_KEY);
         }
-    } catch {
+    }
+    catch
+    {
         // 忽略
     }
 }
 
-export function loadSelectedPalette(): string | null {
-    try {
+export function loadSelectedPalette(): string | null
+{
+    try
+    {
         return localStorage.getItem(SELECTED_PALETTE_KEY);
-    } catch {
+    }
+    catch
+    {
         return null;
     }
 }
 
-export function saveSelectedPalette(id: string) {
-    try {
+export function saveSelectedPalette(id: string)
+{
+    try
+    {
         localStorage.setItem(SELECTED_PALETTE_KEY, id);
-    } catch {
+    }
+    catch
+    {
         // 忽略
     }
 }
@@ -72,7 +99,8 @@ export function saveSelectedPalette(id: string) {
  * CRUD
  * --------------------------------------------------------------------------- */
 
-export function createCustomPalette(name: string, colors: string[]): CustomPalette {
+export function createCustomPalette(name: string, colors: string[]): CustomPalette
+{
     const now = Date.now();
     return {
         id: crypto.randomUUID(),
@@ -88,7 +116,8 @@ export function updateCustomPalette(
     palettes: CustomPalette[],
     id: string,
     patch: { name?: string; colors?: string[] }
-): CustomPalette[] {
+): CustomPalette[]
+{
     return palettes.map((p) =>
         p.id === id
             ? {
@@ -101,7 +130,8 @@ export function updateCustomPalette(
     );
 }
 
-export function deleteCustomPalette(palettes: CustomPalette[], id: string): CustomPalette[] {
+export function deleteCustomPalette(palettes: CustomPalette[], id: string): CustomPalette[]
+{
     return palettes.filter((p) => p.id !== id);
 }
 
@@ -110,13 +140,15 @@ export function deleteCustomPalette(palettes: CustomPalette[], id: string): Cust
  * --------------------------------------------------------------------------- */
 
 /** 检查两个颜色数组是否相同（顺序敏感）。 */
-function colorsEqual(a: string[], b: string[]): boolean {
+function colorsEqual(a: string[], b: string[]): boolean
+{
     if (a.length !== b.length) return false;
     return a.every((c, i) => c.toLowerCase() === b[i].toLowerCase());
 }
 
 /** 如果名称已存在，则通过追加数字后缀派生唯一名称。 */
-function deduplicateName(name: string, existing: CustomPalette[]): string {
+function deduplicateName(name: string, existing: CustomPalette[]): string
+{
     const names = new Set(existing.map((p) => p.name));
     if (!names.has(name)) return name;
     let suffix = 2;
@@ -124,7 +156,8 @@ function deduplicateName(name: string, existing: CustomPalette[]): string {
     return `${name} (${suffix})`;
 }
 
-export interface ImportPaletteResult {
+export interface ImportPaletteResult
+{
     palettes: CustomPalette[];
     imported: CustomPalette[];
     skipped: string[];
@@ -141,7 +174,8 @@ export interface ImportPaletteResult {
 export function importCustomPalettes(
     existing: CustomPalette[],
     incoming: CustomPalette[]
-): ImportPaletteResult {
+): ImportPaletteResult
+{
     const result: ImportPaletteResult = {
         palettes: [...existing],
         imported: [],
@@ -150,7 +184,8 @@ export function importCustomPalettes(
         renamed: [],
     };
 
-    for (const raw of incoming) {
+    for (const raw of incoming)
+    {
         if (!raw || typeof raw.name !== 'string' || !Array.isArray(raw.colors)) continue;
 
         const validColors = raw.colors.filter((c) => typeof c === 'string');
@@ -167,7 +202,8 @@ export function importCustomPalettes(
 
         // 1. ID 匹配 → 覆盖
         const idMatch = result.palettes.findIndex((p) => p.id === palette.id);
-        if (idMatch !== -1) {
+        if (idMatch !== -1)
+        {
             result.palettes[idMatch] = { ...palette, updatedAt: now };
             result.overwritten.push(palette.name);
             result.imported.push(result.palettes[idMatch]);
@@ -176,14 +212,16 @@ export function importCustomPalettes(
 
         // 2. 内容匹配（颜色相同）→ 跳过
         const contentMatch = result.palettes.find((p) => colorsEqual(p.colors, validColors));
-        if (contentMatch) {
+        if (contentMatch)
+        {
             result.skipped.push(`${palette.name} (matches "${contentMatch.name}")`);
             continue;
         }
 
         // 3. 名称匹配 → 重命名
         const nameMatch = result.palettes.some((p) => p.name === palette.name);
-        if (nameMatch) {
+        if (nameMatch)
+        {
             palette.name = deduplicateName(palette.name, result.palettes);
             result.renamed.push(palette.name);
         }
@@ -199,27 +237,34 @@ export function importCustomPalettes(
  * 将 JSON 字符串解析为自定义调色板数组。
  * 接受单个调色板对象或数组。
  */
-export function parseCustomPaletteFile(json: string): CustomPalette[] | null {
-    try {
+export function parseCustomPaletteFile(json: string): CustomPalette[] | null
+{
+    try
+    {
         const parsed = JSON.parse(json);
         if (Array.isArray(parsed)) return parsed;
-        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.colors)) {
+        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.colors))
+        {
             return [parsed as CustomPalette];
         }
         return null;
-    } catch {
+    }
+    catch
+    {
         return null;
     }
 }
 
 /** 为自定义调色板构建导出 blob。 */
-export function exportCustomPaletteBlob(palette: CustomPalette): Blob {
+export function exportCustomPaletteBlob(palette: CustomPalette): Blob
+{
     return new Blob([JSON.stringify(palette, null, 2)], {
         type: 'application/json',
     });
 }
 
 /** 清理名称以便用作文件名。 */
-export function customPaletteFileName(name: string): string {
+export function customPaletteFileName(name: string): string
+{
     return `${name.replace(/[^a-zA-Z0-9_-]/g, '_')}.kpal`;
 }

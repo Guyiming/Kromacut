@@ -21,9 +21,11 @@ export type PrintSettings = {
 export const clampNumber = (value: number, min: number, max: number) =>
     Math.max(min, Math.min(max, value));
 
-export const loadPrintSettingsFromStorage = (): PrintSettings | null => {
+export const loadPrintSettingsFromStorage = (): PrintSettings | null =>
+{
     if (typeof window === 'undefined') return null;
-    try {
+    try
+    {
         const raw = window.localStorage.getItem(PRINT_SETTINGS_STORAGE_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw) as Partial<PrintSettings>;
@@ -42,16 +44,22 @@ export const loadPrintSettingsFromStorage = (): PrintSettings | null => {
                 : DEFAULT_PRINT_SETTINGS.pixelSize;
         const smoothMeshing = typeof parsed.smoothMeshing === 'boolean' ? parsed.smoothMeshing : DEFAULT_PRINT_SETTINGS.smoothMeshing;
         return { layerHeight, slicerFirstLayerHeight, pixelSize, smoothMeshing };
-    } catch {
+    }
+    catch
+    {
         return null;
     }
 };
 
-export const savePrintSettingsToStorage = (settings: PrintSettings) => {
+export const savePrintSettingsToStorage = (settings: PrintSettings) =>
+{
     if (typeof window === 'undefined') return;
-    try {
+    try
+    {
         window.localStorage.setItem(PRINT_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-    } catch {
+    }
+    catch
+    {
         // 忽略存储失败（例如隐私模式、超出配额）。
     }
 };

@@ -2,15 +2,18 @@ import JSZip from 'jszip';
 import * as THREE from 'three';
 import { MINIMAL_PROJECT_SETTINGS, KROMACUT_CONFIG } from './slicerDefaults';
 
-export interface Export3MFOptions {
+export interface Export3MFOptions
+{
     layerHeight?: number;
     firstLayerHeight?: number;
     layerFilamentColors?: string[]; // 可选的每层耗材颜色（十六进制），用于导出
     onProgress?: (progress: number) => void;
 }
 
-function generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+function generateUUID()
+{
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c)
+    {
         const r = (Math.random() * 16) | 0,
             v = c == 'x' ? r : (r & 0x3) | 0x8;
         return v.toString(16);
@@ -20,7 +23,8 @@ function generateUUID() {
 export async function exportObjectTo3MFBlob(
     root: THREE.Object3D,
     options?: Export3MFOptions
-): Promise<Blob> {
+): Promise<Blob>
+{
     const zip = new JSZip();
 
     // [Content_Types].xml
@@ -44,10 +48,13 @@ export async function exportObjectTo3MFBlob(
     // 收集网格
     const meshes: THREE.Mesh[] = [];
     root.updateMatrixWorld(true);
-    root.traverse((obj) => {
-        if ((obj as THREE.Mesh).isMesh) {
+    root.traverse((obj) =>
+    {
+        if ((obj as THREE.Mesh).isMesh)
+        {
             const m = obj as THREE.Mesh;
-            if (m.geometry && m.visible) {
+            if (m.geometry && m.visible)
+            {
                 meshes.push(m);
             }
         }
@@ -60,7 +67,8 @@ export async function exportObjectTo3MFBlob(
     const colorMap = new Map<string, number>();
     const colors: string[] = [];
 
-    const normalizeHex = (hex?: string): string | null => {
+    const normalizeHex = (hex?: string): string | null =>
+    {
         if (!hex) return null;
         const cleaned = hex.replace('#', '').toUpperCase();
         return cleaned.length === 6 ? cleaned : null;
@@ -69,13 +77,16 @@ export async function exportObjectTo3MFBlob(
     const getMaterialIndex = (
         material: THREE.Material | THREE.Material[],
         overrideHex?: string
-    ): number => {
+    ): number =>
+    {
         const mat = Array.isArray(material) ? material[0] : material;
         let hex = normalizeHex(overrideHex) || 'FFFFFF';
-        if (!overrideHex && 'color' in mat && (mat as THREE.MeshStandardMaterial).color) {
+        if (!overrideHex && 'color' in mat && (mat as THREE.MeshStandardMaterial).color)
+        {
             hex = (mat as THREE.MeshStandardMaterial).color.getHexString().toUpperCase();
         }
-        if (!colorMap.has(hex)) {
+        if (!colorMap.has(hex))
+        {
             colorMap.set(hex, colors.length);
             colors.push(hex);
         }
@@ -83,7 +94,8 @@ export async function exportObjectTo3MFBlob(
     };
 
     // 预先计算所有材质，以便正确写入头部
-    for (let i = 0; i < meshes.length; i++) {
+    for (let i = 0; i < meshes.length; i++)
+    {
         const overrideHex = options?.layerFilamentColors?.[i];
         getMaterialIndex(meshes[i].material, overrideHex);
     }
@@ -92,10 +104,12 @@ export async function exportObjectTo3MFBlob(
     const projectSettings = { ...MINIMAL_PROJECT_SETTINGS };
 
     // 应用用户选项
-    if (options?.layerHeight) {
+    if (options?.layerHeight)
+    {
         projectSettings.layer_height = options.layerHeight.toString();
     }
-    if (options?.firstLayerHeight) {
+    if (options?.firstLayerHeight)
+    {
         projectSettings.initial_layer_print_height = options.firstLayerHeight.toString();
     }
 
@@ -123,9 +137,11 @@ export async function exportObjectTo3MFBlob(
     // 将块大小减小到 10MB，以更安全地处理字符串拼接限制和内存压力
     const CHUNK_SIZE = 10 * 1024 * 1024;
 
-    const write = (str: string) => {
+    const write = (str: string) =>
+    {
         currentChunk += str;
-        if (currentChunk.length > CHUNK_SIZE) {
+        if (currentChunk.length > CHUNK_SIZE)
+        {
             xmlParts.push(currentChunk);
             currentChunk = '';
         }
@@ -136,7 +152,8 @@ export async function exportObjectTo3MFBlob(
     let nextId = 2;
 
     // 浮点数格式化辅助函数 — 优化以避免字符串分配（toFixed/replace）
-    const f = (n: number) => {
+    const f = (n: number) =>
+    {
         // 四舍五入到 5 位小数
         return (Math.round(n * 100000) / 100000).toString();
     };
@@ -155,11 +172,13 @@ export async function exportObjectTo3MFBlob(
  <metadata name="BambuStudio:3mfVersion">1</metadata>
  <metadata name="Application">Kromacut_Print</metadata>
 `;
-    if (options?.layerHeight !== undefined) {
+    if (options?.layerHeight !== undefined)
+    {
         header += ` <metadata name="slic3rpe:layer_height">${options.layerHeight}</metadata>
 `;
     }
-    if (options?.firstLayerHeight !== undefined) {
+    if (options?.firstLayerHeight !== undefined)
+    {
         header += ` <metadata name="slic3rpe:first_layer_height">${options.firstLayerHeight}</metadata>
 `;
     }
@@ -167,10 +186,12 @@ export async function exportObjectTo3MFBlob(
 `;
 
     // 如果有颜色则写入基础材质
-    if (colors.length > 0) {
+    if (colors.length > 0)
+    {
         header += `  <basematerials id="${baseMatId}">
 `;
-        for (const hex of colors) {
+        for (const hex of colors)
+        {
             header += `   <base name="${hex}" displaycolor="#${hex}FF" />
 `;
         }
@@ -192,7 +213,8 @@ export async function exportObjectTo3MFBlob(
         meshIdx: number,
         phase: 'vertices' | 'triangles',
         phaseFrac: number
-    ) => {
+    ) =>
+    {
         if (!onProgress) return;
         const meshFrac =
             (meshIdx + (phase === 'vertices' ? phaseFrac * 0.5 : 0.5 + phaseFrac * 0.5)) /
@@ -201,7 +223,8 @@ export async function exportObjectTo3MFBlob(
         onProgress(meshFrac * 0.8);
     };
 
-    for (let i = 0; i < meshes.length; i++) {
+    for (let i = 0; i < meshes.length; i++)
+    {
         const mesh = meshes[i];
         const overrideHex = options?.layerFilamentColors?.[i];
         const matIdx = getMaterialIndex(mesh.material, overrideHex);
@@ -213,7 +236,8 @@ export async function exportObjectTo3MFBlob(
             !overrideHex &&
             'color' in mesh.material &&
             (mesh.material as THREE.MeshStandardMaterial).color
-        ) {
+        )
+        {
             hex = (mesh.material as THREE.MeshStandardMaterial).color.getHexString().toUpperCase();
         }
         // 颜色/挤出机使用从 1 开始的索引
@@ -236,13 +260,15 @@ export async function exportObjectTo3MFBlob(
         const index = geom.getIndex();
 
         const count = pos.count;
-        for (let j = 0; j < count; j++) {
+        for (let j = 0; j < count; j++)
+        {
             v.fromBufferAttribute(pos, j).applyMatrix4(mesh.matrixWorld);
             write(`   <vertex x="${f(v.x)}" y="${f(v.y)}" z="${f(v.z)}" />
 `);
 
             opsSinceYield++;
-            if (opsSinceYield > YIELD_EVERY) {
+            if (opsSinceYield > YIELD_EVERY)
+            {
                 opsSinceYield = 0;
                 reportMeshProgress(i, 'vertices', (j + 1) / count);
                 await new Promise((resolve) => setTimeout(resolve, 0));
@@ -253,24 +279,31 @@ export async function exportObjectTo3MFBlob(
         write(`  <triangles>
 `);
 
-        if (index) {
+        if (index)
+        {
             const triCount = index.count;
-            for (let j = 0; j < triCount; j += 3) {
+            for (let j = 0; j < triCount; j += 3)
+            {
                 write(`   <triangle v1="${index.getX(j)}" v2="${index.getX(j + 1)}" v3="${index.getX(j + 2)}" />
 `);
                 opsSinceYield++;
-                if (opsSinceYield > YIELD_EVERY) {
+                if (opsSinceYield > YIELD_EVERY)
+                {
                     opsSinceYield = 0;
                     reportMeshProgress(i, 'triangles', (j + 3) / triCount);
                     await new Promise((resolve) => setTimeout(resolve, 0));
                 }
             }
-        } else {
-            for (let j = 0; j < pos.count; j += 3) {
+        }
+        else
+        {
+            for (let j = 0; j < pos.count; j += 3)
+            {
                 write(`   <triangle v1="${j}" v2="${j + 1}" v3="${j + 2}" />
 `);
                 opsSinceYield++;
-                if (opsSinceYield > YIELD_EVERY) {
+                if (opsSinceYield > YIELD_EVERY)
+                {
                     opsSinceYield = 0;
                     reportMeshProgress(i, 'triangles', (j + 3) / pos.count);
                     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -293,7 +326,8 @@ export async function exportObjectTo3MFBlob(
 `);
     write(` <components>
 `);
-    for (const id of componentIds) {
+    for (const id of componentIds)
+    {
         const compUuid = generateUUID();
         write(`  <component objectid="${id}" p:UUID="${compUuid}" />
 `);
@@ -314,7 +348,8 @@ export async function exportObjectTo3MFBlob(
     write(`</model>`);
 
     // 刷新剩余的块
-    if (currentChunk.length > 0) {
+    if (currentChunk.length > 0)
+    {
         xmlParts.push(currentChunk);
     }
 
@@ -332,7 +367,8 @@ export async function exportObjectTo3MFBlob(
   <metadata key="name" value="Kromacut Model"/>
   <metadata key="extruder" value="1"/>
 `;
-    for (const comp of componentMeta) {
+    for (const comp of componentMeta)
+    {
         const safeName = comp.name
             .replace(/&/g, '&amp;')
             .replace(/"/g, '&quot;')
@@ -372,7 +408,8 @@ export async function exportObjectTo3MFBlob(
     return await zip.generateAsync(
         { type: 'blob' },
         onProgress
-            ? (meta) => {
+            ? (meta) =>
+            {
                   // zip 进度从 80% 到 100%
                   onProgress(0.8 + (meta.percent / 100) * 0.2);
               }

@@ -28,26 +28,30 @@ import { generateCenterWeightedMapSimple, generateEdgeWeightedMapSimple } from '
 import { computeProfileConfidence } from './calibration';
 
 /** RGB 颜色表示（0-255 范围） */
-export interface RGB {
+export interface RGB
+{
     r: number;
     g: number;
     b: number;
 }
 
 /** Lab 颜色表示，用于感知颜色差异 */
-export interface Lab {
+export interface Lab
+{
     L: number;
     a: number;
     b: number;
 }
 
 /** 带频率权重的 Lab 颜色（0-1，已归一化） */
-interface WeightedLab extends Lab {
+interface WeightedLab extends Lab
+{
     weight: number;
 }
 
 /** 两种耗材之间的过渡区 */
-export interface TransitionZone {
+export interface TransitionZone
+{
     filamentId: string;
     filamentColor: string;
     filamentTd: number; // 该耗材的透射距离 (TD)
@@ -58,7 +62,8 @@ export interface TransitionZone {
 }
 
 /** 自动上色算法生成的层段 */
-export interface AutoPaintLayer {
+export interface AutoPaintLayer
+{
     filamentId: string;
     filamentColor: string;
     startHeight: number; // 距 Z=0 的毫米数
@@ -66,7 +71,8 @@ export interface AutoPaintLayer {
 }
 
 /** 自动上色生成器的结果 */
-export interface AutoPaintResult {
+export interface AutoPaintResult
+{
     layers: AutoPaintLayer[];
     totalHeight: number;
     idealHeight: number; // 不进行压缩时的理想高度
@@ -98,7 +104,8 @@ export interface AutoPaintResult {
 /**
  * 将十六进制颜色转换为 RGB
  */
-export function hexToRgb(hex: string): RGB {
+export function hexToRgb(hex: string): RGB
+{
     const h = hex.replace(/^#/, '');
     return {
         r: parseInt(h.slice(0, 2), 16) || 0,
@@ -110,7 +117,8 @@ export function hexToRgb(hex: string): RGB {
 /**
  * 将 RGB 转换为十六进制
  */
-export function rgbToHex(rgb: RGB): string {
+export function rgbToHex(rgb: RGB): string
+{
     const toHex = (n: number) =>
         Math.round(Math.max(0, Math.min(255, n)))
             .toString(16)
@@ -121,7 +129,8 @@ export function rgbToHex(rgb: RGB): string {
 /**
  * 将 RGB（0-255）转换到 Lab 色彩空间，用于感知颜色差异计算
  */
-export function rgbToLab(rgb: RGB): Lab {
+export function rgbToLab(rgb: RGB): Lab
+{
     // 首先将 RGB 转换为 XYZ
     let r = rgb.r / 255;
     let g = rgb.g / 255;
@@ -169,7 +178,8 @@ export function rgbToLab(rgb: RGB): Lab {
  * DeltaE < 1 通常人眼难以察觉。
  * DeltaE < 2.3 被认为是"刚好可察觉的差异"。
  */
-export function deltaE(color1: RGB, color2: RGB): number {
+export function deltaE(color1: RGB, color2: RGB): number
+{
     const lab1 = rgbToLab(color1);
     const lab2 = rgbToLab(color2);
 
@@ -179,7 +189,8 @@ export function deltaE(color1: RGB, color2: RGB): number {
 /**
  * 直接根据 Lab 值计算 Delta E（CIE76）
  */
-export function deltaELab(lab1: Lab, lab2: Lab): number {
+export function deltaELab(lab1: Lab, lab2: Lab): number
+{
     return Math.sqrt(
         Math.pow(lab1.L - lab2.L, 2) + Math.pow(lab1.a - lab2.a, 2) + Math.pow(lab1.b - lab2.b, 2)
     );
@@ -192,7 +203,8 @@ export function deltaELab(lab1: Lab, lab2: Lab): number {
  * @param color - RGB 颜色（0-255 范围）
  * @returns 亮度值（0-255 范围）
  */
-export function getLuminance(color: RGB): number {
+export function getLuminance(color: RGB): number
+{
     return 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
 }
 
@@ -218,9 +230,11 @@ export function blendColors(
     filamentColor: RGB,
     filamentTD: number,
     layerThickness: number
-): RGB {
+): RGB
+{
     // 防止除零或非法 TD 值
-    if (filamentTD <= 0 || layerThickness <= 0) {
+    if (filamentTD <= 0 || layerThickness <= 0)
+    {
         return filamentColor;
     }
 
@@ -246,7 +260,8 @@ export function blendColors(
  * @param thickness - 层厚（毫米）
  * @returns 不透明度（0-1）
  */
-export function getOpacity(filamentTD: number, thickness: number): number {
+export function getOpacity(filamentTD: number, thickness: number): number
+{
     if (filamentTD <= 0 || thickness <= 0) return 0;
     const transmission = Math.pow(0.1, thickness / filamentTD);
     return 1 - transmission;
@@ -284,9 +299,11 @@ export function calculateTransitionThickness(
     filamentColor: RGB,
     filamentTD: number,
     layerHeight: number
-): number {
+): number
+{
     // 如果颜色已经足够接近，则提前退出
-    if (deltaE(backgroundColor, filamentColor) < DELTA_E_THRESHOLD) {
+    if (deltaE(backgroundColor, filamentColor) < DELTA_E_THRESHOLD)
+    {
         return layerHeight; // 仍然至少需要一层
     }
 
@@ -303,17 +320,20 @@ export function calculateTransitionThickness(
     const maxThickness = Math.max(layerHeight, filamentTD * OPACITY_CAP);
 
     // 模拟逐层添加，直到颜色收敛或达到上限
-    while (thickness < maxThickness) {
+    while (thickness < maxThickness)
+    {
         thickness += layerHeight;
         currentColor = blendColors(backgroundColor, filamentColor, filamentTD, thickness);
 
         // 如果混合颜色已感知接近目标色，则停止
-        if (deltaE(currentColor, filamentColor) < DELTA_E_THRESHOLD) {
+        if (deltaE(currentColor, filamentColor) < DELTA_E_THRESHOLD)
+        {
             break;
         }
 
         // 如果不透明度已经很高，也停止 —— 收益递减
-        if (getOpacity(filamentTD, thickness) > 0.85) {
+        if (getOpacity(filamentTD, thickness) > 0.85)
+        {
             break;
         }
     }
@@ -337,8 +357,10 @@ export function calculateIdealHeight(
     sortedFilaments: Array<{ id: string; color: string; td: number }>,
     layerHeight: number,
     baseThickness: number = 0.6
-): { idealHeight: number; zones: TransitionZone[] } {
-    if (sortedFilaments.length === 0) {
+): { idealHeight: number; zones: TransitionZone[] }
+{
+    if (sortedFilaments.length === 0)
+    {
         return { idealHeight: baseThickness, zones: [] };
     }
 
@@ -368,7 +390,8 @@ export function calculateIdealHeight(
     currentHeight = foundationThickness;
 
     // 后续区域：每种耗材都从前一种过渡而来
-    for (let i = 1; i < sortedFilaments.length; i++) {
+    for (let i = 1; i < sortedFilaments.length; i++)
+    {
         const filament = sortedFilaments[i];
         const filamentRgb = hexToRgb(filament.color);
 
@@ -408,14 +431,17 @@ export function calculateIdealHeight(
 export function compressZones(
     zones: TransitionZone[],
     maxHeight: number
-): { compressedZones: TransitionZone[]; compressionRatio: number } {
-    if (zones.length === 0) {
+): { compressedZones: TransitionZone[]; compressionRatio: number }
+{
+    if (zones.length === 0)
+    {
         return { compressedZones: [], compressionRatio: 1 };
     }
 
     const idealHeight = zones[zones.length - 1].endHeight;
 
-    if (idealHeight <= maxHeight) {
+    if (idealHeight <= maxHeight)
+    {
         // 无需压缩
         return { compressedZones: zones, compressionRatio: 1 };
     }
@@ -426,7 +452,8 @@ export function compressZones(
     const compressedZones: TransitionZone[] = [];
     let currentHeight = 0;
 
-    for (const zone of zones) {
+    for (const zone of zones)
+    {
         const compressedThickness = zone.idealThickness * compressionRatio;
         compressedZones.push({
             ...zone,
@@ -468,7 +495,8 @@ function clusterImageColors(
     swatches: Array<{ hex: string; count?: number }>,
     maxClusters: number = 32,
     threshold: number = 5.0
-): WeightedLab[] {
+): WeightedLab[]
+{
     if (swatches.length === 0) return [];
 
     // 转换为带计数的 Lab
@@ -490,22 +518,26 @@ function clusterImageColors(
 
     const thresholdSq = threshold * threshold;
 
-    for (const item of items) {
+    for (const item of items)
+    {
         // 找到最近的已有簇
         let bestIdx = -1;
         let bestDeSq = Infinity;
 
-        for (let ci = 0; ci < clusters.length; ci++) {
+        for (let ci = 0; ci < clusters.length; ci++)
+        {
             const c = clusters[ci];
             const deSq =
                 (item.lab.L - c.L) ** 2 + (item.lab.a - c.a) ** 2 + (item.lab.b - c.b) ** 2;
-            if (deSq < bestDeSq) {
+            if (deSq < bestDeSq)
+            {
                 bestDeSq = deSq;
                 bestIdx = ci;
             }
         }
 
-        if (bestIdx >= 0 && bestDeSq < thresholdSq) {
+        if (bestIdx >= 0 && bestDeSq < thresholdSq)
+        {
             // 并入已有簇（加权更新簇心）
             const c = clusters[bestIdx];
             const total = c.totalCount + item.count;
@@ -515,7 +547,9 @@ function clusterImageColors(
             c.a = c.a * w1 + item.lab.a * w2;
             c.b = c.b * w1 + item.lab.b * w2;
             c.totalCount = total;
-        } else if (clusters.length < maxClusters) {
+        }
+        else if (clusters.length < maxClusters)
+        {
             // 新建簇
             clusters.push({
                 L: item.lab.L,
@@ -523,9 +557,12 @@ function clusterImageColors(
                 b: item.lab.b,
                 totalCount: item.count,
             });
-        } else {
+        }
+        else
+        {
             // 已达到最大簇数 —— 强制并入最近的簇
-            if (bestIdx >= 0) {
+            if (bestIdx >= 0)
+            {
                 const c = clusters[bestIdx];
                 const total = c.totalCount + item.count;
                 const w1 = c.totalCount / total;
@@ -558,12 +595,15 @@ function clusterImageColors(
  * 生成数组的所有非空子集。
  * 对于 N 个元素，会产生 2^N - 1 个子集。
  */
-function nonEmptySubsets<T>(arr: T[]): T[][] {
+function nonEmptySubsets<T>(arr: T[]): T[][]
+{
     const result: T[][] = [];
     const n = arr.length;
-    for (let mask = 1; mask < 1 << n; mask++) {
+    for (let mask = 1; mask < 1 << n; mask++)
+    {
         const subset: T[] = [];
-        for (let i = 0; i < n; i++) {
+        for (let i = 0; i < n; i++)
+        {
             if (mask & (1 << i)) subset.push(arr[i]);
         }
         result.push(subset);
@@ -575,12 +615,15 @@ function nonEmptySubsets<T>(arr: T[]): T[][] {
  * 生成数组的所有排列。
  * 仅当 array.length <= 7（最多 5040 种排列）时使用。
  */
-function permutations<T>(arr: T[]): T[][] {
+function permutations<T>(arr: T[]): T[][]
+{
     if (arr.length <= 1) return [arr];
     const result: T[][] = [];
-    for (let i = 0; i < arr.length; i++) {
+    for (let i = 0; i < arr.length; i++)
+    {
         const rest = [...arr.slice(0, i), ...arr.slice(i + 1)];
-        for (const perm of permutations(rest)) {
+        for (const perm of permutations(rest))
+        {
             result.push([arr[i], ...perm]);
         }
     }
@@ -602,7 +645,8 @@ function buildAchievableColorPalette(
     sequence: Array<{ id: string; color: string; td: number }>,
     layerHeight: number,
     firstLayerHeight: number
-): Array<{ height: number; lab: Lab; rgb: RGB }> {
+): Array<{ height: number; lab: Lab; rgb: RGB }>
+{
     if (sequence.length === 0) return [];
 
     // 计算该序列对应的过渡区
@@ -622,25 +666,32 @@ function buildAchievableColorPalette(
     let prevZoneIndex = 0;
     let thicknessInCurrentZone = 0;
 
-    while (currentZ < totalHeight + layerHeight * 0.5) {
+    while (currentZ < totalHeight + layerHeight * 0.5)
+    {
         const thickness = layerIndex === 0 ? Math.max(firstLayerHeight, layerHeight) : layerHeight;
 
         // 找出当前活动的过渡区
         let activeZoneIndex = 0;
-        for (let zi = 0; zi < zones.length; zi++) {
-            if (currentZ >= zones[zi].startHeight && currentZ < zones[zi].endHeight) {
+        for (let zi = 0; zi < zones.length; zi++)
+        {
+            if (currentZ >= zones[zi].startHeight && currentZ < zones[zi].endHeight)
+            {
                 activeZoneIndex = zi;
                 break;
             }
-            if (currentZ >= zones[zi].startHeight) {
+            if (currentZ >= zones[zi].startHeight)
+            {
                 activeZoneIndex = zi;
             }
         }
 
-        if (activeZoneIndex !== prevZoneIndex) {
+        if (activeZoneIndex !== prevZoneIndex)
+        {
             thicknessInCurrentZone = currentZ - zones[activeZoneIndex].startHeight + thickness;
             prevZoneIndex = activeZoneIndex;
-        } else {
+        }
+        else
+        {
             thicknessInCurrentZone += thickness;
         }
 
@@ -648,9 +699,12 @@ function buildAchievableColorPalette(
         const filamentColor = hexToRgb(zone.filamentColor);
 
         let blendedColor: RGB;
-        if (activeZoneIndex === 0) {
+        if (activeZoneIndex === 0)
+        {
             blendedColor = filamentColor;
-        } else {
+        }
+        else
+        {
             const bgColor = hexToRgb(zones[activeZoneIndex - 1].filamentColor);
             blendedColor = blendColors(
                 bgColor,
@@ -683,13 +737,15 @@ function buildAchievableColorPalette(
 function deduplicatePalette(
     palette: Array<{ height: number; lab: Lab; rgb: RGB }>,
     threshold: number = 3.0
-): Array<{ height: number; lab: Lab; rgb: RGB }> {
+): Array<{ height: number; lab: Lab; rgb: RGB }>
+{
     if (palette.length === 0) return [];
 
     const result: Array<{ height: number; lab: Lab; rgb: RGB }> = [];
     let clusterStart = 0;
 
-    for (let i = 1; i <= palette.length; i++) {
+    for (let i = 1; i <= palette.length; i++)
+    {
         const prev = palette[i - 1];
         const curr = i < palette.length ? palette[i] : null;
 
@@ -697,11 +753,12 @@ function deduplicatePalette(
             !curr ||
             Math.sqrt(
                 (curr.lab.L - prev.lab.L) ** 2 +
-                    (curr.lab.a - prev.lab.a) ** 2 +
-                    (curr.lab.b - prev.lab.b) ** 2
+                (curr.lab.a - prev.lab.a) ** 2 +
+                (curr.lab.b - prev.lab.b) ** 2
             ) >= threshold;
 
-        if (shouldBreak) {
+        if (shouldBreak)
+        {
             // 使用该簇的中点项
             const midIdx = Math.floor((clusterStart + (i - 1)) / 2);
             result.push(palette[midIdx]);
@@ -732,7 +789,8 @@ function deduplicatePalette(
 function scoreSequenceAgainstImage(
     palette: Array<{ height: number; lab: Lab; rgb: RGB }>,
     imageTargets: WeightedLab[]
-): number {
+): number
+{
     if (palette.length === 0) return Infinity;
 
     // 去重：折叠连续的几乎相同的颜色
@@ -746,18 +804,21 @@ function scoreSequenceAgainstImage(
     // 同时跟踪哪些去重后的调色板项被某个目标使用了（"有用的"）
     const usedPaletteEntries = new Set<number>();
 
-    for (const target of imageTargets) {
+    for (const target of imageTargets)
+    {
         let minDE = Infinity;
         let bestHeight = reduced[0].height;
         let bestIdx = 0;
-        for (let ri = 0; ri < reduced.length; ri++) {
+        for (let ri = 0; ri < reduced.length; ri++)
+        {
             const entry = reduced[ri];
             const de = Math.sqrt(
                 (entry.lab.L - target.L) ** 2 +
-                    (entry.lab.a - target.a) ** 2 +
-                    (entry.lab.b - target.b) ** 2
+                (entry.lab.a - target.a) ** 2 +
+                (entry.lab.b - target.b) ** 2
             );
-            if (de < minDE) {
+            if (de < minDE)
+            {
                 minDE = de;
                 bestHeight = entry.height;
                 bestIdx = ri;
@@ -775,9 +836,11 @@ function scoreSequenceAgainstImage(
 
     // 2. 高度分布惩罚：当不同的图像颜色被映射到
     //    同一高度（导致表面平坦）时进行惩罚
-    if (bestMatchHeights.length > 1 && reduced.length > 1) {
+    if (bestMatchHeights.length > 1 && reduced.length > 1)
+    {
         const totalModelHeight = reduced[reduced.length - 1].height - reduced[0].height;
-        if (totalModelHeight > 0) {
+        if (totalModelHeight > 0)
+        {
             const uniqueHeights = new Set(bestMatchHeights.map((h) => Math.round(h * 100)));
             const spreadRatio = uniqueHeights.size / imageTargets.length;
             const spreadPenalty = (1 - spreadRatio) * imageTargets.length * 5;
@@ -795,7 +858,8 @@ function scoreSequenceAgainstImage(
     // 4. 过渡浪费惩罚：未被任何目标匹配的调色板项。
     //    如果某个去重后的调色板项不是任何图像目标的最佳匹配，
     //    则产生它的过渡高度就属于浪费的模型空间。
-    if (reduced.length > 1) {
+    if (reduced.length > 1)
+    {
         const wastedEntries = reduced.length - usedPaletteEntries.size;
         weightedDeltaE += wastedEntries * 1.5;
     }
@@ -824,13 +888,16 @@ function findBestFilamentOrder(
     layerHeight: number,
     firstLayerHeight: number,
     optimizerOptions?: Partial<OptimizerOptions>
-): { sortedFilaments: Filament[]; result?: OptimizerResult } {
-    if (filaments.length <= 1) {
+): { sortedFilaments: Filament[]; result?: OptimizerResult }
+{
+    if (filaments.length <= 1)
+    {
         return { sortedFilaments: [...filaments] };
     }
 
     // 如果提供了选项，使用高级优化器
-    if (optimizerOptions) {
+    if (optimizerOptions)
+    {
         return findBestFilamentOrderWithOptimizer(
             filaments,
             imageSwatches,
@@ -866,12 +933,14 @@ function findBestFilamentOrder(
 function applyRegionWeightHeuristic(
     clusters: WeightedLab[],
     regionWeights: Float32Array
-): WeightedLab[] {
+): WeightedLab[]
+{
     if (clusters.length === 0 || regionWeights.length === 0) return clusters;
 
     // 计算平均区域权重，用以决定模式强度
     let sumWeight = 0;
-    for (let i = 0; i < regionWeights.length; i++) {
+    for (let i = 0; i < regionWeights.length; i++)
+    {
         sumWeight += regionWeights[i];
     }
     const avgWeight = sumWeight / regionWeights.length;
@@ -879,7 +948,8 @@ function applyRegionWeightHeuristic(
     // 计算亮度方差以检测对比度分布
     // 高对比度（边缘模式）vs 较为均匀（中心模式）
     let sumSqDiff = 0;
-    for (let i = 0; i < regionWeights.length; i++) {
+    for (let i = 0; i < regionWeights.length; i++)
+    {
         const diff = regionWeights[i] - avgWeight;
         sumSqDiff += diff * diff;
     }
@@ -888,14 +958,18 @@ function applyRegionWeightHeuristic(
 
     // 应用启发式调整
     let totalAdjustedWeight = 0;
-    const adjustedClusters = clusters.map((cluster) => {
+    const adjustedClusters = clusters.map((cluster) =>
+    {
         let modifier = 1.0;
 
-        if (isHighContrast) {
+        if (isHighContrast)
+        {
             // 边缘加权模式：提升高对比度颜色（很亮或很暗）
             const isHighContrast = cluster.L < 30 || cluster.L > 70;
             modifier = isHighContrast ? 1.3 : 0.85;
-        } else {
+        }
+        else
+        {
             // 中心加权模式：提升中等亮度颜色（中心区域常见）
             const isMidLuminance = cluster.L >= 35 && cluster.L <= 65;
             modifier = isMidLuminance ? 1.2 : 0.9;
@@ -911,7 +985,8 @@ function applyRegionWeightHeuristic(
     });
 
     // 重新归一化使权重之和为 1.0
-    if (totalAdjustedWeight > 0) {
+    if (totalAdjustedWeight > 0)
+    {
         return adjustedClusters.map((c) => ({
             ...c,
             weight: c.weight / totalAdjustedWeight,
@@ -930,14 +1005,16 @@ function findBestFilamentOrderWithOptimizer(
     layerHeight: number,
     firstLayerHeight: number,
     optimizerOptions: Partial<OptimizerOptions>
-): { sortedFilaments: Filament[]; result: OptimizerResult } {
+): { sortedFilaments: Filament[]; result: OptimizerResult }
+{
     // 将图像颜色聚类成带权 Lab 目标
     let imageTargets = clusterImageColors(imageSwatches, 32, 5.0);
 
     // 如果提供了区域权重，则应用区域权重启发式
     // 注意：这只是近似，因为我们在聚类时已经丢失了像素位置。
     // 真正的实现需要在聚合之前对像素加权。
-    if (optimizerOptions.regionWeights) {
+    if (optimizerOptions.regionWeights)
+    {
         imageTargets = applyRegionWeightHeuristic(imageTargets, optimizerOptions.regionWeights);
     }
 
@@ -974,7 +1051,8 @@ function findBestFilamentOrderLegacy(
     imageSwatches: Array<{ hex: string; count?: number }>,
     layerHeight: number,
     firstLayerHeight: number
-): Filament[] {
+): Filament[]
+{
     if (filaments.length <= 1) return [...filaments];
 
     // 将图像颜色聚类成带权代表目标
@@ -987,19 +1065,23 @@ function findBestFilamentOrderLegacy(
         td: f.td * FRONTLIT_TD_SCALE,
     }));
 
-    if (filaments.length <= 6) {
+    if (filaments.length <= 6)
+    {
         // 穷举搜索 —— 尝试所有非空子集的所有排列
         // N=6 时：sum of k! * C(6,k) for k=1..6 = 1957 种排列
         const subsets = nonEmptySubsets(scaledFilaments);
         let bestScore = Infinity;
         let bestPerm = scaledFilaments;
 
-        for (const subset of subsets) {
+        for (const subset of subsets)
+        {
             const perms = permutations(subset);
-            for (const perm of perms) {
+            for (const perm of perms)
+            {
                 const palette = buildAchievableColorPalette(perm, layerHeight, firstLayerHeight);
                 const score = scoreSequenceAgainstImage(palette, imageTargets);
-                if (score < bestScore) {
+                if (score < bestScore)
+                {
                     bestScore = score;
                     bestPerm = perm;
                 }
@@ -1017,7 +1099,8 @@ function findBestFilamentOrderLegacy(
     let globalBestSequence: typeof scaledFilaments = [];
     let globalBestScore = Infinity;
 
-    for (const { f: startFilament } of allStarts) {
+    for (const { f: startFilament } of allStarts)
+    {
         const remaining = scaledFilaments.filter((sf) => sf.id !== startFilament.id);
         const sequence = [startFilament];
 
@@ -1025,11 +1108,13 @@ function findBestFilamentOrderLegacy(
         let currentScore = scoreSequenceAgainstImage(palette, imageTargets);
         const pool = [...remaining];
 
-        while (pool.length > 0) {
+        while (pool.length > 0)
+        {
             let bestIdx = -1;
             let bestScore = currentScore;
 
-            for (let i = 0; i < pool.length; i++) {
+            for (let i = 0; i < pool.length; i++)
+            {
                 const candidate = [...sequence, pool[i]];
                 const candidatePalette = buildAchievableColorPalette(
                     candidate,
@@ -1037,7 +1122,8 @@ function findBestFilamentOrderLegacy(
                     firstLayerHeight
                 );
                 const candidateScore = scoreSequenceAgainstImage(candidatePalette, imageTargets);
-                if (candidateScore < bestScore) {
+                if (candidateScore < bestScore)
+                {
                     bestScore = candidateScore;
                     bestIdx = i;
                 }
@@ -1051,7 +1137,8 @@ function findBestFilamentOrderLegacy(
             currentScore = bestScore;
         }
 
-        if (currentScore < globalBestScore) {
+        if (currentScore < globalBestScore)
+        {
             globalBestScore = currentScore;
             globalBestSequence = [...sequence];
         }
@@ -1089,7 +1176,8 @@ function buildRepeatedSwapSequence(
     imageSwatches: Array<{ hex: string; count?: number }>,
     layerHeight: number,
     firstLayerHeight: number
-): Filament[] {
+): Filament[]
+{
     if (baseFilaments.length === 0) return [];
 
     // 将图像颜色聚类成带权代表目标
@@ -1120,18 +1208,21 @@ function buildRepeatedSwapSequence(
     // 最小改进阈值 —— 收益不足时停止
     const MIN_IMPROVEMENT = 2.0;
 
-    for (let iter = 0; iter < MAX_EXTRA_SWAPS; iter++) {
+    for (let iter = 0; iter < MAX_EXTRA_SWAPS; iter++)
+    {
         let bestCandidate: (typeof candidates)[0] | null = null;
         let bestInsertPos = -1;
         let bestScore = currentScore;
 
-        for (const candidate of candidates) {
+        for (const candidate of candidates)
+        {
             // 尝试在序列中的每个位置插入（不仅是追加到末尾）。
             // 较早插入可让后续耗材自然地叠加在其上，
             // 可能复用现有的过渡，而不必新建昂贵的过渡。
             // 位置 0 = 新基础层，位置 len = 追加到栈顶。
             // 如果会产生连续相同的耗材，则跳过。
-            for (let pos = 1; pos <= currentSequence.length; pos++) {
+            for (let pos = 1; pos <= currentSequence.length; pos++)
+            {
                 // 跳过连续重复
                 if (pos > 0 && currentSequence[pos - 1].id === candidate.id) continue;
                 if (pos < currentSequence.length && currentSequence[pos].id === candidate.id)
@@ -1149,7 +1240,8 @@ function buildRepeatedSwapSequence(
                 );
                 const trialScore = scoreSequenceAgainstImage(trialPalette, imageTargets);
 
-                if (trialScore < bestScore) {
+                if (trialScore < bestScore)
+                {
                     bestScore = trialScore;
                     bestCandidate = candidate;
                     bestInsertPos = pos;
@@ -1157,7 +1249,8 @@ function buildRepeatedSwapSequence(
             }
         }
 
-        if (!bestCandidate || bestInsertPos < 0 || currentScore - bestScore < MIN_IMPROVEMENT) {
+        if (!bestCandidate || bestInsertPos < 0 || currentScore - bestScore < MIN_IMPROVEMENT)
+        {
             break; // 没有有意义的改善
         }
 
@@ -1175,14 +1268,15 @@ function buildRepeatedSwapSequence(
     }
 
     // 映射回原始（未缩放）耗材，保留含重复的序列
-    return currentSequence.map((sf) => {
+    return currentSequence.map((sf) =>
+    {
         const orig = allFilaments.find((f) => f.id === sf.id)!;
         return { ...orig }; // 返回保留原始 TD 的副本
     });
 }
 
 // =============================================================================
-// 自动上色主算法
+// 自动上色主算法   main entry point
 // =============================================================================
 
 /**
@@ -1217,9 +1311,11 @@ export function generateAutoLayers(
     optimizerOptions?: Partial<OptimizerOptions>,
     regionWeightingMode: 'uniform' | 'center' | 'edge' = 'uniform',
     imageDimensions?: { width: number; height: number } | null
-): AutoPaintResult {
+): AutoPaintResult
+{
     // --- 步骤 1：参数校验 ---
-    if (filaments.length === 0) {
+    if (filaments.length === 0)
+    {
         return {
             layers: [],
             totalHeight: 0,
@@ -1237,7 +1333,8 @@ export function generateAutoLayers(
         };
     }
 
-    if (imageSwatches.length === 0) {
+    if (imageSwatches.length === 0)
+    {
         return {
             layers: [],
             totalHeight: 0,
@@ -1261,15 +1358,19 @@ export function generateAutoLayers(
 
     // 如果提供了图像尺寸且模式不是 uniform，则生成区域权重图
     let regionWeights: Float32Array | undefined;
-    if (imageDimensions && regionWeightingMode !== 'uniform') {
-        if (regionWeightingMode === 'center') {
+    if (imageDimensions && regionWeightingMode !== 'uniform')
+    {
+        if (regionWeightingMode === 'center')
+        {
             // 中心加权：优先关注图像中心
             regionWeights = generateCenterWeightedMapSimple(
                 imageDimensions.width,
                 imageDimensions.height,
                 0.5 // 强度参数
             );
-        } else if (regionWeightingMode === 'edge') {
+        }
+        else if (regionWeightingMode === 'edge')
+        {
             // 边缘加权（基于几何）：优先关注边界区域。
             regionWeights = generateEdgeWeightedMapSimple(
                 imageDimensions.width,
@@ -1281,14 +1382,15 @@ export function generateAutoLayers(
     // 将区域权重合并到优化器选项中
     const mergedOptimizerOptions: Partial<OptimizerOptions> | undefined = optimizerOptions
         ? {
-              ...optimizerOptions,
-              regionWeights: regionWeights ?? optimizerOptions.regionWeights,
-          }
+            ...optimizerOptions,
+            regionWeights: regionWeights ?? optimizerOptions.regionWeights,
+        }
         : regionWeights
-          ? { regionWeights }
-          : undefined;
+            ? { regionWeights }
+            : undefined;
 
-    if (enhancedColorMatch) {
+    if (enhancedColorMatch)
+    {
         // 增强：寻找最能覆盖图像调色板的排序
         const orderingResult = findBestFilamentOrder(
             filaments,
@@ -1302,7 +1404,8 @@ export function generateAutoLayers(
         optimizerResult = orderingResult.result;
 
         // 如果同时启用了重复换料，则扩展该序列
-        if (allowRepeatedSwaps) {
+        if (allowRepeatedSwaps)
+        {
             sortedFilaments = buildRepeatedSwapSequence(
                 sortedFilaments,
                 filaments,
@@ -1311,9 +1414,12 @@ export function generateAutoLayers(
                 firstLayerHeight
             );
         }
-    } else {
+    }
+    else
+    {
         // 标准：按亮度排序（由暗到亮）
-        sortedFilaments = [...filaments].sort((a, b) => {
+        sortedFilaments = [...filaments].sort((a, b) =>
+        {
             const lumA = getLuminance(hexToRgb(a.color));
             const lumB = getLuminance(hexToRgb(b.color));
             return lumA - lumB;
@@ -1376,7 +1482,8 @@ export function generateAutoLayers(
     };
 
     // 如果可用，添加优化器元数据
-    if (optimizerResult) {
+    if (optimizerResult)
+    {
         result.optimizerMetadata = {
             algorithm: optimizerResult.resolvedAlgorithm || optimizerOptions?.algorithm || 'auto',
             score: optimizerResult.score,
@@ -1398,7 +1505,8 @@ export function generateAutoLayers(
  */
 export function calculateRecommendedHeight(
     filaments: Array<{ color: string; td: number }>
-): number {
+): number
+{
     if (filaments.length === 0) return 2.0;
 
     // TD 之和大致表示所需的总过渡空间
@@ -1436,8 +1544,10 @@ export function autoPaintToSliceHeights(
     colorOrder: number[];
     virtualSwatches: Array<{ hex: string; a: number }>;
     filamentSwatches: Array<{ hex: string; a: number }>;
-} {
-    if (result.layers.length === 0 || result.totalHeight <= 0) {
+}
+{
+    if (result.layers.length === 0 || result.totalHeight <= 0)
+    {
         return {
             colorSliceHeights: [],
             colorOrder: [],
@@ -1460,26 +1570,33 @@ export function autoPaintToSliceHeights(
     let prevZoneIndex = 0;
     let thicknessInCurrentZone = 0;
 
-    while (currentZ < result.totalHeight) {
+    while (currentZ < result.totalHeight)
+    {
         const thickness = layerIndex === 0 ? Math.max(firstLayerHeight, layerHeight) : layerHeight;
 
         // 找出当前 Z 高度处所属的过渡区
         let activeZoneIndex = 0;
-        for (let zi = 0; zi < zones.length; zi++) {
-            if (currentZ >= zones[zi].startHeight && currentZ < zones[zi].endHeight) {
+        for (let zi = 0; zi < zones.length; zi++)
+        {
+            if (currentZ >= zones[zi].startHeight && currentZ < zones[zi].endHeight)
+            {
                 activeZoneIndex = zi;
                 break;
             }
-            if (currentZ >= zones[zi].startHeight) {
+            if (currentZ >= zones[zi].startHeight)
+            {
                 activeZoneIndex = zi;
             }
         }
 
         // 跟踪当前过渡区内的累积厚度，用于颜色混合
-        if (activeZoneIndex !== prevZoneIndex) {
+        if (activeZoneIndex !== prevZoneIndex)
+        {
             thicknessInCurrentZone = currentZ - zones[activeZoneIndex].startHeight + thickness;
             prevZoneIndex = activeZoneIndex;
-        } else {
+        }
+        else
+        {
             thicknessInCurrentZone += thickness;
         }
 
@@ -1490,9 +1607,12 @@ export function autoPaintToSliceHeights(
         // 基础区 → 纯耗材色（不透明的基底）
         // 后续区 → 将耗材叠加到前一区的颜色上
         let blendedColor: RGB;
-        if (activeZoneIndex === 0) {
+        if (activeZoneIndex === 0)
+        {
             blendedColor = filamentColor;
-        } else {
+        }
+        else
+        {
             const bgColor = hexToRgb(zones[activeZoneIndex - 1].filamentColor);
             blendedColor = blendColors(
                 bgColor,
@@ -1510,7 +1630,8 @@ export function autoPaintToSliceHeights(
         currentZ += thickness;
         layerIndex++;
 
-        if (layerIndex > 500) {
+        if (layerIndex > 500)
+        {
             console.warn('autoPaintToSliceHeights: too many layers, stopping at 500');
             break;
         }
@@ -1550,19 +1671,23 @@ export function luminanceToHeight(
     transitionZones: TransitionZone[],
     totalHeight: number,
     firstLayerHeight: number
-): number {
-    if (transitionZones.length === 0) {
+): number
+{
+    if (transitionZones.length === 0)
+    {
         return firstLayerHeight;
     }
 
     // 基础高度（最暗像素至少获得基础层高度）
     const baseHeight = transitionZones[0].endHeight;
 
-    if (normalizedLuminance <= 0) {
+    if (normalizedLuminance <= 0)
+    {
         return baseHeight;
     }
 
-    if (normalizedLuminance >= 1) {
+    if (normalizedLuminance >= 1)
+    {
         return totalHeight;
     }
 
@@ -1601,12 +1726,14 @@ function calculateAutoConfidence(
         filamentCoverage: number;
         compressionImpact: number;
     };
-} {
+}
+{
     // 1. 标定质量
     // 使用实际标定数据，对所有耗材标定置信度求平均
     let calibrationQuality = 0.5; // 未标定耗材的默认基准值
 
-    if (filaments.length > 0) {
+    if (filaments.length > 0)
+    {
         const confidences = filaments.map((f) =>
             computeProfileConfidence({
                 calibration: f.calibration,
@@ -1622,19 +1749,22 @@ function calculateAutoConfidence(
     // 次要因素：耗材数量限制了可达到的最大覆盖度。
     let filamentCoverage = 0.5; // 基准值
 
-    if (filaments.length > 0 && imageSwatches.length > 0) {
+    if (filaments.length > 0 && imageSwatches.length > 0)
+    {
         const filamentColors = sortedFilaments.map((f) => rgbToLab(hexToRgb(f.color)));
 
         // 对每个图像颜色，找最近的耗材色（按像素数加权)
         let totalDeltaE = 0;
         let totalWeight = 0;
 
-        for (const imageSwatch of imageSwatches) {
+        for (const imageSwatch of imageSwatches)
+        {
             const imageColor = rgbToLab(hexToRgb(imageSwatch.hex));
             const weight = imageSwatch.count ?? 1;
 
             let minDeltaE = Infinity;
-            for (const filamentColor of filamentColors) {
+            for (const filamentColor of filamentColors)
+            {
                 const de = deltaELab(imageColor, filamentColor);
                 if (de < minDeltaE) minDeltaE = de;
             }
@@ -1668,7 +1798,8 @@ function calculateAutoConfidence(
     let compressionImpact = compressionRatio;
 
     // 非线性惩罚：轻度压缩（0.9）尚可，重度（<0.7）较差
-    if (compressionRatio < 0.9) {
+    if (compressionRatio < 0.9)
+    {
         compressionImpact = 0.9 * Math.pow(compressionRatio / 0.9, 2);
     }
 
@@ -1702,7 +1833,8 @@ export function debugAutoPaint(
     layerHeight: number,
     firstLayerHeight: number,
     maxHeight?: number
-): void {
+): void
+{
     const result = generateAutoLayers(
         filaments,
         imageSwatches,
@@ -1726,11 +1858,12 @@ export function debugAutoPaint(
     console.log('Filament order (dark→light):', result.filamentOrder);
     console.log('---');
     console.log('Transition Zones:');
-    result.transitionZones.forEach((zone, i) => {
+    result.transitionZones.forEach((zone, i) =>
+    {
         const status = zone.actualThickness < zone.idealThickness ? '⚠️ compressed' : '✓';
         console.log(
             `  ${i + 1}. ${zone.filamentColor} | ${zone.startHeight.toFixed(2)}mm → ${zone.endHeight.toFixed(2)}mm | ` +
-                `Ideal: ${zone.idealThickness.toFixed(2)}mm, Actual: ${zone.actualThickness.toFixed(2)}mm ${status}`
+            `Ideal: ${zone.idealThickness.toFixed(2)}mm, Actual: ${zone.actualThickness.toFixed(2)}mm ${status}`
         );
     });
     console.groupEnd();

@@ -1,11 +1,13 @@
-export interface HSL {
+export interface HSL
+{
     h: number;
     s: number;
     l: number;
 }
 
 // 将 RGB（0-255）转换为 HSL（h 单位为度）
-export function rgbToHsl(r: number, g: number, b: number): HSL {
+export function rgbToHsl(r: number, g: number, b: number): HSL
+{
     r /= 255;
     g /= 255;
     b /= 255;
@@ -14,10 +16,12 @@ export function rgbToHsl(r: number, g: number, b: number): HSL {
     let h = 0;
     let s = 0;
     const l = (max + min) / 2;
-    if (max !== min) {
+    if (max !== min)
+    {
         const d = max - min;
         s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-        switch (max) {
+        switch (max)
+        {
             case r:
                 h = (g - b) / d + (g < b ? 6 : 0);
                 break;

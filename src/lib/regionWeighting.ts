@@ -13,7 +13,8 @@
 // 类型定义
 // ============================================================================
 
-export interface RegionWeightOptions {
+export interface RegionWeightOptions
+{
     method: 'uniform' | 'center-weighted' | 'edge-detection' | 'face-detection' | 'custom';
     centerStrength?: number; // 0-1，中心偏向的强度
     edgeThreshold?: number; // 0-255，边缘检测的阈值
@@ -31,11 +32,13 @@ export interface RegionWeightOptions {
 export function generateWeightMap(
     imageData: ImageData,
     options: RegionWeightOptions
-): Float32Array {
+): Float32Array
+{
     const { width, height } = imageData;
     const weights = new Float32Array(width * height);
 
-    switch (options.method) {
+    switch (options.method)
+    {
         case 'uniform':
             weights.fill(1.0);
             break;
@@ -49,9 +52,12 @@ export function generateWeightMap(
             break;
 
         case 'custom':
-            if (options.customMask) {
+            if (options.customMask)
+            {
                 weights.set(options.customMask);
-            } else {
+            }
+            else
+            {
                 weights.fill(1.0);
             }
             break;
@@ -74,14 +80,17 @@ export function generateCenterWeightedMapSimple(
     width: number,
     height: number,
     strength: number = 0.5
-): Float32Array {
+): Float32Array
+{
     const weights = new Float32Array(width * height);
     const centerX = width / 2;
     const centerY = height / 2;
     const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
 
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++)
+    {
+        for (let x = 0; x < width; x++)
+        {
             const dx = x - centerX;
             const dy = y - centerY;
             const dist = Math.sqrt(dx * dx + dy * dy);
@@ -103,14 +112,17 @@ export function generateCenterWeightedMapSimple(
  * 仅依据几何信息生成简单的边缘优先权重图。
  * 权重朝向图像边界递增，并归一化到 0-1。
  */
-export function generateEdgeWeightedMapSimple(width: number, height: number): Float32Array {
+export function generateEdgeWeightedMapSimple(width: number, height: number): Float32Array
+{
     const weights = new Float32Array(width * height);
     const centerX = width / 2;
     const centerY = height / 2;
     const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
 
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++)
+    {
+        for (let x = 0; x < width; x++)
+        {
             const dx = x - centerX;
             const dy = y - centerY;
             const dist = Math.sqrt(dx * dx + dy * dy);
@@ -134,13 +146,16 @@ function generateCenterWeightedMap(
     height: number,
     weights: Float32Array,
     strength: number
-): void {
+): void
+{
     const centerX = width / 2;
     const centerY = height / 2;
     const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
 
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++)
+    {
+        for (let x = 0; x < width; x++)
+        {
             const dx = x - centerX;
             const dy = y - centerY;
             const dist = Math.sqrt(dx * dx + dy * dy);
@@ -163,21 +178,26 @@ function generateEdgeWeightedMap(
     imageData: ImageData,
     weights: Float32Array,
     threshold: number
-): void {
+): void
+{
     const { width, height, data } = imageData;
 
     // Sobel 卷积核
     const sobelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
     const sobelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
 
-    for (let y = 1; y < height - 1; y++) {
-        for (let x = 1; x < width - 1; x++) {
+    for (let y = 1; y < height - 1; y++)
+    {
+        for (let x = 1; x < width - 1; x++)
+        {
             let gx = 0;
             let gy = 0;
 
             // 在 3x3 窗口内应用 Sobel 算子
-            for (let ky = -1; ky <= 1; ky++) {
-                for (let kx = -1; kx <= 1; kx++) {
+            for (let ky = -1; ky <= 1; ky++)
+            {
+                for (let kx = -1; kx <= 1; kx++)
+                {
                     const px = x + kx;
                     const py = y + ky;
                     const idx = (py * width + px) * 4;
@@ -200,11 +220,13 @@ function generateEdgeWeightedMap(
     }
 
     // 边界以 0.5 填充（无法计算边缘）
-    for (let x = 0; x < width; x++) {
+    for (let x = 0; x < width; x++)
+    {
         weights[x] = 0.5;
         weights[(height - 1) * width + x] = 0.5;
     }
-    for (let y = 0; y < height; y++) {
+    for (let y = 0; y < height; y++)
+    {
         weights[y * width] = 0.5;
         weights[y * width + (width - 1)] = 0.5;
     }
@@ -213,21 +235,27 @@ function generateEdgeWeightedMap(
 /**
  * 在保留相对差异的前提下，将权重归一化到 0-1 范围。
  */
-function normalizeWeights(weights: Float32Array): void {
+function normalizeWeights(weights: Float32Array): void
+{
     let min = Infinity;
     let max = -Infinity;
 
-    for (let i = 0; i < weights.length; i++) {
+    for (let i = 0; i < weights.length; i++)
+    {
         if (weights[i] < min) min = weights[i];
         if (weights[i] > max) max = weights[i];
     }
 
     const range = max - min;
-    if (range > 0) {
-        for (let i = 0; i < weights.length; i++) {
+    if (range > 0)
+    {
+        for (let i = 0; i < weights.length; i++)
+        {
             weights[i] = (weights[i] - min) / range;
         }
-    } else {
+    }
+    else
+    {
         weights.fill(1.0);
     }
 }
@@ -244,23 +272,29 @@ export function blurWeightMap(
     width: number,
     height: number,
     radius: number = 5
-): Float32Array {
+): Float32Array
+{
     const blurred = new Float32Array(weights.length);
     const kernel = createGaussianKernel(radius);
     const kernelSize = kernel.length;
     const halfSize = Math.floor(kernelSize / 2);
 
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++)
+    {
+        for (let x = 0; x < width; x++)
+        {
             let sum = 0;
             let weightSum = 0;
 
-            for (let ky = 0; ky < kernelSize; ky++) {
-                for (let kx = 0; kx < kernelSize; kx++) {
+            for (let ky = 0; ky < kernelSize; ky++)
+            {
+                for (let kx = 0; kx < kernelSize; kx++)
+                {
                     const px = x + kx - halfSize;
                     const py = y + ky - halfSize;
 
-                    if (px >= 0 && px < width && py >= 0 && py < height) {
+                    if (px >= 0 && px < width && py >= 0 && py < height)
+                    {
                         const kernelWeight = kernel[ky * kernelSize + kx];
                         sum += weights[py * width + px] * kernelWeight;
                         weightSum += kernelWeight;
@@ -278,15 +312,18 @@ export function blurWeightMap(
 /**
  * 创建用于模糊的二维高斯卷积核。
  */
-function createGaussianKernel(radius: number): Float32Array {
+function createGaussianKernel(radius: number): Float32Array
+{
     const size = radius * 2 + 1;
     const kernel = new Float32Array(size * size);
     const sigma = radius / 3;
     const twoSigmaSq = 2 * sigma * sigma;
     let sum = 0;
 
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++)
+    {
+        for (let x = 0; x < size; x++)
+        {
             const dx = x - radius;
             const dy = y - radius;
             const value = Math.exp(-(dx * dx + dy * dy) / twoSigmaSq);
@@ -296,7 +333,8 @@ function createGaussianKernel(radius: number): Float32Array {
     }
 
     // 归一化
-    for (let i = 0; i < kernel.length; i++) {
+    for (let i = 0; i < kernel.length; i++)
+    {
         kernel[i] /= sum;
     }
 
@@ -309,22 +347,27 @@ function createGaussianKernel(radius: number): Float32Array {
 export function combineWeightMaps(
     maps: Float32Array[],
     mode: 'max' | 'min' | 'multiply' | 'average' = 'multiply'
-): Float32Array {
-    if (maps.length === 0) {
+): Float32Array
+{
+    if (maps.length === 0)
+    {
         return new Float32Array(0);
     }
 
-    if (maps.length === 1) {
+    if (maps.length === 1)
+    {
         return new Float32Array(maps[0]);
     }
 
     const length = maps[0].length;
     const combined = new Float32Array(length);
 
-    for (let i = 0; i < length; i++) {
+    for (let i = 0; i < length; i++)
+    {
         const values = maps.map((m) => m[i]);
 
-        switch (mode) {
+        switch (mode)
+        {
             case 'max':
                 combined[i] = Math.max(...values);
                 break;
@@ -346,9 +389,11 @@ export function combineWeightMaps(
 /**
  * 反转权重图（高重要性变低，反之亦然）。
  */
-export function invertWeightMap(weights: Float32Array): Float32Array {
+export function invertWeightMap(weights: Float32Array): Float32Array
+{
     const inverted = new Float32Array(weights.length);
-    for (let i = 0; i < weights.length; i++) {
+    for (let i = 0; i < weights.length; i++)
+    {
         inverted[i] = 1.0 - weights[i];
     }
     return inverted;
@@ -362,9 +407,11 @@ export function thresholdWeightMap(
     threshold: number = 0.5,
     aboveValue: number = 1.0,
     belowValue: number = 0.0
-): Float32Array {
+): Float32Array
+{
     const thresholded = new Float32Array(weights.length);
-    for (let i = 0; i < weights.length; i++) {
+    for (let i = 0; i < weights.length; i++)
+    {
         thresholded[i] = weights[i] >= threshold ? aboveValue : belowValue;
     }
     return thresholded;
@@ -382,11 +429,13 @@ export function weightMapToImageData(
     weights: Float32Array,
     width: number,
     height: number
-): ImageData {
+): ImageData
+{
     const imageData = new ImageData(width, height);
     const data = imageData.data;
 
-    for (let i = 0; i < weights.length; i++) {
+    for (let i = 0; i < weights.length; i++)
+    {
         const weight = weights[i];
         const color = heatmapColor(weight);
 
@@ -403,30 +452,38 @@ export function weightMapToImageData(
  * 为 [0, 1] 范围内的值生成热力图颜色。
  * 蓝色（冷）→ 绿色 → 黄色 → 红色（热）
  */
-function heatmapColor(value: number): { r: number; g: number; b: number } {
+function heatmapColor(value: number): { r: number; g: number; b: number }
+{
     const v = Math.max(0, Math.min(1, value));
 
     let r, g, b;
 
-    if (v < 0.25) {
+    if (v < 0.25)
+    {
         // 蓝到青
         const t = v / 0.25;
         r = 0;
         g = Math.round(t * 255);
         b = 255;
-    } else if (v < 0.5) {
+    }
+    else if (v < 0.5)
+    {
         // 青到绿
         const t = (v - 0.25) / 0.25;
         r = 0;
         g = 255;
         b = Math.round((1 - t) * 255);
-    } else if (v < 0.75) {
+    }
+    else if (v < 0.75)
+    {
         // 绿到黄
         const t = (v - 0.5) / 0.25;
         r = Math.round(t * 255);
         g = 255;
         b = 0;
-    } else {
+    }
+    else
+    {
         // 黄到红
         const t = (v - 0.75) / 0.25;
         r = 255;

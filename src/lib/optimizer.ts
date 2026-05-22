@@ -17,7 +17,8 @@ import { rgbToLab, deltaELab, hexToRgb, blendColors, type RGB, type Lab } from '
 // 类型定义
 // ============================================================================
 
-export interface OptimizerOptions {
+export interface OptimizerOptions
+{
     algorithm: 'exhaustive' | 'simulated-annealing' | 'genetic' | 'auto';
     seed?: number; // 用于确定性结果
     maxIterations?: number; // 算法相关的迭代次数上限
@@ -30,7 +31,8 @@ export interface OptimizerOptions {
     cachingEnabled?: boolean; // 启用结果缓存
 }
 
-export interface OptimizerResult {
+export interface OptimizerResult
+{
     order: Filament[]; // 找到的最佳耗材排序
     score: number; // 质量分数（越低越好，基于 deltaE）
     iterations: number; // 已执行的迭代次数
@@ -39,7 +41,8 @@ export interface OptimizerResult {
     resolvedAlgorithm?: string; // 实际使用的算法（'auto' 解析后的结果）
 }
 
-export interface ScoringContext {
+export interface ScoringContext
+{
     imageColors: Array<Lab & { weight: number }>; // 来自图像的带权 Lab 颜色
     layerHeight: number;
     firstLayerHeight: number;
@@ -54,28 +57,34 @@ export interface ScoringContext {
  * LCG（线性同余生成器），用于生成确定性的随机数。
  * 使用《Numerical Recipes》中的参数（a=1664525, c=1013904223, m=2^32）。
  */
-class SeededRandom {
+class SeededRandom
+{
     private state: number;
 
-    constructor(seed: number = Date.now()) {
+    constructor(seed: number = Date.now())
+    {
         this.state = seed >>> 0; // 确保为无符号 32 位
     }
 
     /** 生成 [0, 1) 范围内的随机浮点数 */
-    next(): number {
+    next(): number
+    {
         this.state = (this.state * 1664525 + 1013904223) >>> 0;
         return this.state / 0x100000000;
     }
 
     /** 生成 [min, max) 范围内的随机整数 */
-    nextInt(min: number, max: number): number {
+    nextInt(min: number, max: number): number
+    {
         return Math.floor(this.next() * (max - min)) + min;
     }
 
     /** 使用 Fisher-Yates 算法对数组进行原地洗牌 */
-    shuffle<T>(array: T[]): T[] {
+    shuffle<T>(array: T[]): T[]
+    {
         const arr = [...array];
-        for (let i = arr.length - 1; i > 0; i--) {
+        for (let i = arr.length - 1; i > 0; i--)
+        {
             const j = this.nextInt(0, i + 1);
             [arr[i], arr[j]] = [arr[j], arr[i]];
         }
@@ -87,7 +96,8 @@ class SeededRandom {
 // 结果缓存
 // ============================================================================
 
-class OptimizerCache {
+class OptimizerCache
+{
     private cache = new Map<string, OptimizerResult>();
     private maxSize = 100;
 
@@ -96,7 +106,8 @@ class OptimizerCache {
         context: ScoringContext,
         algorithm?: string,
         seed?: number
-    ): string {
+    ): string
+    {
         // 根据耗材和上下文创建稳定的键
         const filamentKey = filaments
             .map((f) => `${f.color}:${f.td.toFixed(2)}`)
@@ -114,7 +125,8 @@ class OptimizerCache {
         return `${filamentKey}__${imageKey}__${context.layerHeight}__${context.firstLayerHeight}__${algoKey}__${seedKey}`;
     }
 
-    get(filaments: Filament[], context: ScoringContext, algorithm?: string, seed?: number): OptimizerResult | null {
+    get(filaments: Filament[], context: ScoringContext, algorithm?: string, seed?: number): OptimizerResult | null
+    {
         const key = this.getCacheKey(filaments, context, algorithm, seed);
         return this.cache.get(key) || null;
     }
@@ -125,11 +137,13 @@ class OptimizerCache {
         result: OptimizerResult,
         algorithm?: string,
         seed?: number
-    ): void {
+    ): void
+    {
         const key = this.getCacheKey(filaments, context, algorithm, seed);
 
         // 容量已满时驱逐最旧的项
-        if (this.cache.size >= this.maxSize) {
+        if (this.cache.size >= this.maxSize)
+        {
             const firstKey = this.cache.keys().next().value;
             if (firstKey) this.cache.delete(firstKey);
         }
@@ -137,11 +151,13 @@ class OptimizerCache {
         this.cache.set(key, result);
     }
 
-    clear(): void {
+    clear(): void
+    {
         this.cache.clear();
     }
 
-    get size(): number {
+    get size(): number
+    {
         return this.cache.size;
     }
 }
@@ -161,14 +177,16 @@ const globalCache = new OptimizerCache();
 function scoreFilamentOrder(
     filaments: Filament[],
     context: ScoringContext
-): number {
+): number
+{
     if (filaments.length === 0) return Infinity;
 
     let totalError = 0;
     let totalWeight = 0;
 
     // 对每个图像颜色，使用此耗材堆栈寻找最佳可达成的匹配
-    for (const targetColor of context.imageColors) {
+    for (const targetColor of context.imageColors)
+    {
         const achievableColor = findBestAchievableColor(targetColor, filaments, context);
         const error = deltaELab(targetColor, achievableColor);
 
@@ -183,14 +201,18 @@ function scoreFilamentOrder(
 /**
  * 查找将耗材堆叠到某一高度时可达成的最佳颜色。
  * 使用 Beer-Lambert 模拟来预测不同高度下的混合颜色。
+ * 
+ * 此函数被foreach, 每个像素都调用一次
  */
 function findBestAchievableColor(
     targetLab: Lab,
     filaments: Filament[],
     context: ScoringContext
-): Lab {
+): Lab
+{
     if (filaments.length === 0) return { L: 0, a: 0, b: 0 };
-    if (filaments.length === 1) {
+    if (filaments.length === 1)
+    {
         return rgbToLab(hexToRgb(filaments[0].color));
     }
 
@@ -200,13 +222,15 @@ function findBestAchievableColor(
     let bestLab = rgbToLab(hexToRgb(filaments[0].color));
     let bestDelta = deltaELab(targetLab, bestLab);
 
-    for (let i = 0; i <= steps; i++) {
+    for (let i = 0; i <= steps; i++)
+    {
         const height = (i / steps) * maxHeight;
         const blendedColor = simulateStackAtHeight(filaments, height, context);
         const blendedLab = rgbToLab(blendedColor);
         const delta = deltaELab(targetLab, blendedLab);
 
-        if (delta < bestDelta) {
+        if (delta < bestDelta)
+        {
             bestDelta = delta;
             bestLab = blendedLab;
         }
@@ -222,11 +246,13 @@ function simulateStackAtHeight(
     filaments: Filament[],
     targetHeight: number,
     _context: ScoringContext
-): RGB {
+): RGB
+{
     let currentHeight = 0;
     let blendedColor = hexToRgb(filaments[0].color);
 
-    for (let i = 1; i < filaments.length && currentHeight < targetHeight; i++) {
+    for (let i = 1; i < filaments.length && currentHeight < targetHeight; i++)
+    {
         const prevFilament = filaments[i - 1];
         const currentFilament = filaments[i];
         const transitionHeight = Math.min(prevFilament.td * 3, targetHeight - currentHeight);
@@ -250,8 +276,10 @@ function simulateStackAtHeight(
 function optimizeExhaustive(
     filaments: Filament[],
     context: ScoringContext
-): OptimizerResult {
-    if (filaments.length === 0) {
+): OptimizerResult
+{
+    if (filaments.length === 0)
+    {
         return {
             order: [],
             score: Infinity,
@@ -260,7 +288,8 @@ function optimizeExhaustive(
         };
     }
 
-    if (filaments.length === 1) {
+    if (filaments.length === 1)
+    {
         return {
             order: [filaments[0]],
             score: scoreFilamentOrder(filaments, context),
@@ -274,18 +303,22 @@ function optimizeExhaustive(
     let iterations = 0;
 
     // 生成所有排列
-    const permute = (arr: Filament[], start = 0): void => {
-        if (start === arr.length - 1) {
+    const permute = (arr: Filament[], start = 0): void =>
+    {
+        if (start === arr.length - 1)
+        {
             iterations++;
             const score = scoreFilamentOrder(arr, context);
-            if (score < bestScore) {
+            if (score < bestScore)
+            {
                 bestScore = score;
                 bestOrder = [...arr];
             }
             return;
         }
 
-        for (let i = start; i < arr.length; i++) {
+        for (let i = start; i < arr.length; i++)
+        {
             [arr[start], arr[i]] = [arr[i], arr[start]];
             permute(arr, start + 1);
             [arr[start], arr[i]] = [arr[i], arr[start]];
@@ -316,8 +349,10 @@ function optimizeSimulatedAnnealing(
     filaments: Filament[],
     context: ScoringContext,
     options: OptimizerOptions
-): OptimizerResult {
-    if (filaments.length <= 1) {
+): OptimizerResult
+{
+    if (filaments.length <= 1)
+    {
         return optimizeExhaustive(filaments, context);
     }
 
@@ -334,7 +369,8 @@ function optimizeSimulatedAnnealing(
     let temperature = initialTemp;
     let iterations = 0;
 
-    while (iterations < maxIterations && temperature > minTemp) {
+    while (iterations < maxIterations && temperature > minTemp)
+    {
         iterations++;
 
         // 通过交换两个随机耗材生成邻居
@@ -349,11 +385,13 @@ function optimizeSimulatedAnnealing(
         // 如果更优则接受，否则以 exp(-ΔE/T) 的概率接受
         const acceptProbability = deltaE < 0 ? 1.0 : Math.exp(-deltaE / temperature);
 
-        if (rng.next() < acceptProbability) {
+        if (rng.next() < acceptProbability)
+        {
             currentOrder = newOrder;
             currentScore = newScore;
 
-            if (currentScore < bestScore) {
+            if (currentScore < bestScore)
+            {
                 bestScore = currentScore;
                 bestOrder = [...currentOrder];
             }
@@ -386,20 +424,23 @@ function optimizeGenetic(
     filaments: Filament[],
     context: ScoringContext,
     options: OptimizerOptions
-): OptimizerResult {
-    if (filaments.length <= 1) {
+): OptimizerResult
+{
+    if (filaments.length <= 1)
+    {
         return optimizeExhaustive(filaments, context);
     }
 
     const rng = new SeededRandom(options.seed);
     const populationSize = options.populationSize ?? Math.max(50, filaments.length * 10);
-    const maxGenerations = options.maxIterations ?? 100;
+    const maxGenerations = options.maxIterations ?? 100; // 每代评估的总迭代次数上限
     const mutationRate = options.mutationRate ?? 0.1;
-    const eliteCount = options.eliteCount ?? Math.max(2, Math.floor(populationSize * 0.1));
+    const eliteCount = options.eliteCount ?? Math.max(2, Math.floor(populationSize * 0.1)); // 保留10%的精英
 
     // 使用随机排序初始化种群
     let population: Array<{ order: Filament[]; score: number }> = [];
-    for (let i = 0; i < populationSize; i++) {
+    for (let i = 0; i < populationSize; i++)
+    {
         const order = rng.shuffle(filaments);
         const score = scoreFilamentOrder(order, context);
         population.push({ order, score });
@@ -408,19 +449,23 @@ function optimizeGenetic(
     let bestEver = { ...population[0] };
     let generations = 0;
     let stagnantGenerations = 0;
-    const maxStagnant = 20;
+    const maxStagnant = 20; // 如果连续 20 代没有改进则认为收敛
 
-    while (generations < maxGenerations && stagnantGenerations < maxStagnant) {
+    while (generations < maxGenerations && stagnantGenerations < maxStagnant)
+    {
         generations++;
 
         // 按分数排序（越低越好）
         population.sort((a, b) => a.score - b.score);
 
         // 检查是否有改进
-        if (population[0].score < bestEver.score) {
+        if (population[0].score < bestEver.score)
+        {
             bestEver = { order: [...population[0].order], score: population[0].score };
             stagnantGenerations = 0;
-        } else {
+        }
+        else
+        {
             stagnantGenerations++;
         }
 
@@ -431,16 +476,18 @@ function optimizeGenetic(
         }));
 
         // 生成后代
-        while (nextGeneration.length < populationSize) {
+        while (nextGeneration.length < populationSize)
+        {
             // 锦标赛选择：随机选 3 个，挑选最优者
             const parent1 = tournamentSelect(population, 3, rng);
             const parent2 = tournamentSelect(population, 3, rng);
 
             // 顺序交叉（OX）
-            let child = orderCrossover(parent1.order, parent2.order, rng);
+            const child = orderCrossover(parent1.order, parent2.order, rng);
 
             // 变异：以一定概率交换两个位置
-            if (rng.next() < mutationRate) {
+            if (rng.next() < mutationRate)
+            {
                 const i = rng.nextInt(0, child.length);
                 const j = rng.nextInt(0, child.length);
                 [child[i], child[j]] = [child[j], child[i]];
@@ -468,12 +515,15 @@ function tournamentSelect(
     population: Array<{ order: Filament[]; score: number }>,
     tournamentSize: number,
     rng: SeededRandom
-): { order: Filament[]; score: number } {
+): { order: Filament[]; score: number }
+{
     let best = population[rng.nextInt(0, population.length)];
 
-    for (let i = 1; i < tournamentSize; i++) {
+    for (let i = 1; i < tournamentSize; i++)
+    {
         const candidate = population[rng.nextInt(0, population.length)];
-        if (candidate.score < best.score) {
+        if (candidate.score < best.score)
+        {
             best = candidate;
         }
     }
@@ -488,14 +538,16 @@ function orderCrossover(
     parent1: Filament[],
     parent2: Filament[],
     rng: SeededRandom
-): Filament[] {
+): Filament[]
+{
     const length = parent1.length;
     const start = rng.nextInt(0, length);
     const end = rng.nextInt(start + 1, length + 1);
 
     // 从 parent1 复制片段
     const child: (Filament | null)[] = new Array(length).fill(null);
-    for (let i = start; i < end; i++) {
+    for (let i = start; i < end; i++)
+    {
         child[i] = parent1[i];
     }
 
@@ -503,8 +555,10 @@ function orderCrossover(
     const remaining = parent2.filter((f) => !child.includes(f));
     let remainingIdx = 0;
 
-    for (let i = 0; i < length; i++) {
-        if (child[i] === null) {
+    for (let i = 0; i < length; i++)
+    {
+        if (child[i] === null)
+        {
             child[i] = remaining[remainingIdx++];
         }
     }
@@ -528,7 +582,8 @@ export function optimizeFilamentOrder(
     filaments: Filament[],
     context: ScoringContext,
     options: Partial<OptimizerOptions> = {}
-): OptimizerResult {
+): OptimizerResult
+{
     // 判断用户是否提供了显式种子（用于缓存目的）
     const hasExplicitSeed = options.seed !== undefined;
 
@@ -541,27 +596,36 @@ export function optimizeFilamentOrder(
 
     // 根据问题规模自动选择算法（在缓存检查之前）
     let algorithm = opts.algorithm;
-    if (algorithm === 'auto') {
-        if (filaments.length <= 6) {
+    if (algorithm === 'auto')
+    {
+        if (filaments.length <= 6)
+        {
             algorithm = 'exhaustive';
-        } else if (filaments.length <= 10) {
+        }
+        else if (filaments.length <= 10)
+        {
             algorithm = 'simulated-annealing';
-        } else {
+        }
+        else
+        {
             algorithm = 'genetic';
         }
     }
 
     // 仅当用户提供了显式种子时才检查缓存（随机种子不应被缓存）
-    if (opts.cachingEnabled && hasExplicitSeed) {
+    if (opts.cachingEnabled && hasExplicitSeed)
+    {
         const cached = globalCache.get(filaments, context, algorithm, opts.seed);
-        if (cached) {
+        if (cached)
+        {
             return { ...cached, cacheHit: true };
         }
     }
 
     let result: OptimizerResult;
 
-    switch (algorithm) {
+    switch (algorithm)
+    {
         case 'exhaustive':
             result = optimizeExhaustive(filaments, context);
             break;
@@ -579,7 +643,8 @@ export function optimizeFilamentOrder(
     result.resolvedAlgorithm = algorithm;
 
     // 仅当用户提供了显式种子时才缓存（不缓存随机结果）
-    if (opts.cachingEnabled && hasExplicitSeed) {
+    if (opts.cachingEnabled && hasExplicitSeed)
+    {
         globalCache.set(filaments, context, result, algorithm, opts.seed);
     }
 
@@ -589,14 +654,16 @@ export function optimizeFilamentOrder(
 /**
  * 清空优化器缓存
  */
-export function clearOptimizerCache(): void {
+export function clearOptimizerCache(): void
+{
     globalCache.clear();
 }
 
 /**
  * 获取优化器缓存的统计信息
  */
-export function getOptimizerCacheStats(): { size: number; maxSize: number } {
+export function getOptimizerCacheStats(): { size: number; maxSize: number }
+{
     return {
         size: globalCache.size,
         maxSize: 100,
