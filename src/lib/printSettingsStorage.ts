@@ -5,9 +5,9 @@
 export const PRINT_SETTINGS_STORAGE_KEY = 'kromacut:3d-print-settings';
 
 export const DEFAULT_PRINT_SETTINGS = {
-    layerHeight: 0.12,
-    slicerFirstLayerHeight: 0.2,
-    pixelSize: 0.1,
+    layerHeight: 0.08,
+    slicerFirstLayerHeight: 0.16,
+    pixelSize: 0.2,
     smoothMeshing: false,
 } as const;
 

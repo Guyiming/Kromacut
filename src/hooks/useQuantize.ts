@@ -30,6 +30,7 @@ interface Params {
     ) => void;
     onProgress?: (value: number) => void;
     onStage?: (stage: 'load' | 'algorithm' | 'post' | 'swatches' | 'final') => void;
+    quantizeEnabled?: boolean;
 }
 
 export function useQuantize({
@@ -43,6 +44,7 @@ export function useQuantize({
     onImmediateSwatches,
     onProgress,
     onStage,
+    quantizeEnabled = true,
 }: Params) {
     const applyQuantize = async (
         canvasPreviewRef: React.RefObject<CanvasPreviewHandle | null>,
@@ -179,7 +181,10 @@ export function useQuantize({
                 }
             }
             const topLocal = Array.from(cmap.entries())
-                .sort((a, b) => b[1] - a[1])
+                .sort((a, b) => {
+                    if (b[1] !== a[1]) return b[1] - a[1];
+                    return a[0] - b[0];
+                })
                 .slice(0, Math.min(cmap.size, SWATCH_CAP))
                 .map((entry) => {
                     const key = entry[0];
@@ -213,6 +218,14 @@ export function useQuantize({
             console.warn('immediate swatches failed', err);
         }
         bump(0.98);
+        if (!quantizeEnabled) {
+            // When quantization is disabled, do not write the canvas-roundtripped
+            // result back to imageSrc. Swatches were still emitted via
+            // onImmediateSwatches above. Skip the toBlob+setImage step entirely.
+            bump(1);
+            onStage?.('final');
+            return;
+        }
         const outBlob = await new Promise<Blob | null>((res) =>
             c.toBlob((b) => res(b), 'image/png')
         );

@@ -33,6 +33,7 @@
         "@types/jszip": "^3.4.0",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
+        "fast-png": "^8.0.0",
         "jszip": "^3.10.1",
         "lucide-react": "^0.546.0",
         "react": "^19.1.1",

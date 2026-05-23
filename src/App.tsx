@@ -38,6 +38,8 @@ import {
     AlertDialogAction,
     AlertDialogCancel,
 } from './components/ui/alert-dialog';
+import { Card } from './components/ui/card';
+import { Switch } from './components/ui/switch';
 // ...existing imports
 
 const AUTOPAINT_STORAGE_KEY = 'kromacut.autopaint.v1';
@@ -126,6 +128,7 @@ function App(): React.ReactElement | null {
     const [showCheckerboard, setShowCheckerboard] = useState<boolean>(false);
     const [isCropMode, setIsCropMode] = useState(false);
     const [hasValidCropSelection, setHasValidCropSelection] = useState(false);
+    const [quantizeEnabled, setQuantizeEnabled] = useState<boolean>(false);
     const {
         isQuantizing,
         setIsQuantizing,
@@ -145,6 +148,7 @@ function App(): React.ReactElement | null {
         selectedPalette,
         customPalettes,
         imageSrc,
+        quantizeEnabled,
         setImage: (u, push = true) => {
             invalidate();
             setImage(u, push);
@@ -319,6 +323,22 @@ function App(): React.ReactElement | null {
                                     />
                                     {/* file input stays here (hidden); uploader buttons moved to preview actions */}
                                     <div className="space-y-4">
+                                        <Card className="p-4 border border-border/50">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div>
+                                                    <span className="font-semibold text-foreground">
+                                                        启用量化
+                                                    </span>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        关闭时，量化结果不会覆盖原始图像（保留原始 PNG 像素以保证 swatches 一致性）
+                                                    </p>
+                                                </div>
+                                                <Switch
+                                                    checked={quantizeEnabled}
+                                                    onCheckedChange={setQuantizeEnabled}
+                                                />
+                                            </div>
+                                        </Card>
                                         <AdjustmentsPanel
                                             key={adjustmentsEpoch}
                                             defs={SLIDER_DEFS}

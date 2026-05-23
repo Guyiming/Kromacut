@@ -2,15 +2,16 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
-import os from 'os';
 import fs from 'fs';
 
-function devFileLogger(): Plugin {
+const DEBUG_LOG_PATH = 'D:/CODE/HueRelief/HueRelief/Dist/logs/tslog.txt';
+
+function devDebugLogWriter(): Plugin {
     return {
-        name: 'kromacut-dev-file-logger',
+        name: 'kromacut-dev-debug-log-writer',
         apply: 'serve',
         configureServer(server) {
-            server.middlewares.use('/__log', (req, res) => {
+            server.middlewares.use('/__write-debug-log', (req, res) => {
                 if (req.method !== 'POST') {
                     res.statusCode = 405;
                     res.end();
@@ -21,8 +22,8 @@ function devFileLogger(): Plugin {
                 req.on('end', () => {
                     try {
                         const body = Buffer.concat(chunks).toString('utf-8');
-                        const filePath = path.join(os.homedir(), 'Documents', 'ts_log.txt');
-                        fs.appendFileSync(filePath, body + '\n', 'utf-8');
+                        fs.mkdirSync(path.dirname(DEBUG_LOG_PATH), { recursive: true });
+                        fs.writeFileSync(DEBUG_LOG_PATH, body, 'utf-8');
                         res.statusCode = 204;
                         res.end();
                     } catch (e) {
@@ -38,7 +39,7 @@ function devFileLogger(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
     base: '/',
-    plugins: [react(), tailwindcss(), devFileLogger()],
+    plugins: [react(), tailwindcss(), devDebugLogWriter()],
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src'),

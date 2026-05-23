@@ -12,6 +12,7 @@
 
 import type { Filament } from '@/types';
 import { rgbToLab, deltaELab, hexToRgb, blendColors, type RGB, type Lab } from './autoPaint';
+import { debugLog } from './debugLog';
 
 // ============================================================================
 // 类型定义
@@ -431,11 +432,26 @@ function optimizeGenetic(
         return optimizeExhaustive(filaments, context);
     }
 
-    const rng = new SeededRandom(options.seed);
+    //options.seed
+    const tmpseed: number = 123456;
+    const rng = new SeededRandom(tmpseed);
     const populationSize = options.populationSize ?? Math.max(50, filaments.length * 10);
     const maxGenerations = options.maxIterations ?? 100; // 每代评估的总迭代次数上限
     const mutationRate = options.mutationRate ?? 0.1;
     const eliteCount = options.eliteCount ?? Math.max(2, Math.floor(populationSize * 0.1)); // 保留10%的精英
+
+    // 诊断：打印 GA 入口的 inventory 顺序与配置（用于和 CPP 端对齐 diff）
+    if (import.meta.env.DEV) {
+        debugLog('---->打印GA-inventory');
+        const invLines = filaments
+            .map((f, i) => `---->[${i}] color=${f.color.toLowerCase()}, td=${f.td.toFixed(6)}`)
+            .join('\n');
+        debugLog(`---->GA inventory count=${filaments.length}\n${invLines}`);
+        debugLog('---->打印GA-config');
+        debugLog(
+            `---->GA config populationSize=${populationSize}, maxGenerations=${maxGenerations}, mutationRate=${mutationRate.toFixed(6)}, eliteCount=${eliteCount}`
+        );
+    }
 
     // 使用随机排序初始化种群
     let population: Array<{ order: Filament[]; score: number }> = [];
@@ -446,10 +462,26 @@ function optimizeGenetic(
         population.push({ order, score });
     }
 
+    // 诊断：打印初始种群前 5 个个体（order 用 inventory 索引序列）
+    if (import.meta.env.DEV) {
+        debugLog('---->打印GA-init-pop');
+        const dump = Math.min(population.length, 5);
+        const lines: string[] = [`---->GA init pop dump=${dump}/${population.length}`];
+        for (let i = 0; i < dump; i++) {
+            const ind = population[i];
+            const idx = ind.order.map((f) => filaments.indexOf(f)).join(',');
+            lines.push(`---->[${i}] order=${idx}, score=${ind.score.toFixed(6)}`);
+        }
+        debugLog(lines.join('\n'));
+    }
+
     let bestEver = { ...population[0] };
     let generations = 0;
     let stagnantGenerations = 0;
     const maxStagnant = 20; // 如果连续 20 代没有改进则认为收敛
+
+    // 诊断：累积每代的最优 score（用于和 CPP 端对齐 diff，定位分叉代）
+    const genTrace: string[] = [];
 
     while (generations < maxGenerations && stagnantGenerations < maxStagnant)
     {
@@ -467,6 +499,13 @@ function optimizeGenetic(
         else
         {
             stagnantGenerations++;
+        }
+
+        // 诊断：记录本代最优 score 与历史最优 score
+        if (import.meta.env.DEV) {
+            genTrace.push(
+                `---->[gen=${generations}] sortedBest=${population[0].score.toFixed(6)}, bestEver=${bestEver.score.toFixed(6)}, stagnant=${stagnantGenerations}`
+            );
         }
 
         // 精英保留：保留最优个体
@@ -498,6 +537,12 @@ function optimizeGenetic(
         }
 
         population = nextGeneration;
+    }
+
+    // 诊断：一次性 flush 每代轨迹（避免每代 fetch 一次写文件）
+    if (import.meta.env.DEV) {
+        debugLog('---->打印GA-gen-trace');
+        debugLog(`---->GA gen-trace count=${genTrace.length}\n${genTrace.join('\n')}`);
     }
 
     return {

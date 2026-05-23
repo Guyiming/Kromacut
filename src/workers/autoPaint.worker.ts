@@ -10,6 +10,7 @@ import { generateAutoLayers } from '../lib/autoPaint';
 import type { Filament } from '../types';
 import type { OptimizerOptions } from '../lib/optimizer';
 import type { AutoPaintResult } from '../lib/autoPaint';
+import { consumeDebugLogs } from '../lib/debugLog';
 
 export interface AutoPaintWorkerRequest {
     id: number;
@@ -29,6 +30,7 @@ export interface AutoPaintWorkerResponse {
     id: number;
     result?: AutoPaintResult;
     error?: string;
+    debugLogs?: string;
 }
 
 self.onmessage = (e: MessageEvent<AutoPaintWorkerRequest>) => {
@@ -48,12 +50,15 @@ self.onmessage = (e: MessageEvent<AutoPaintWorkerRequest>) => {
             req.imageDimensions
         );
 
-        const response: AutoPaintWorkerResponse = { id: req.id, result };
+        const debugLogs = consumeDebugLogs();
+        const response: AutoPaintWorkerResponse = { id: req.id, result, debugLogs };
         self.postMessage(response);
     } catch (err) {
+        const debugLogs = consumeDebugLogs();
         const response: AutoPaintWorkerResponse = {
             id: req.id,
             error: err instanceof Error ? err.message : String(err),
+            debugLogs,
         };
         self.postMessage(response);
     }

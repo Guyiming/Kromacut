@@ -93,8 +93,8 @@ export default function ThreeDControls({ swatches, imageDimensions, onChange, on
         persisted?.paintMode ?? 'manual'
     );
     const [autoPaintMaxHeight, setAutoPaintMaxHeight] = useState<number | undefined>(undefined);
-    const [enhancedColorMatch, setEnhancedColorMatch] = useState(persisted?.enhancedColorMatch ?? false);
-    const [allowRepeatedSwaps, setAllowRepeatedSwaps] = useState(persisted?.allowRepeatedSwaps ?? false);
+    const [enhancedColorMatch, setEnhancedColorMatch] = useState(persisted?.enhancedColorMatch ?? true);
+    const [allowRepeatedSwaps, setAllowRepeatedSwaps] = useState(persisted?.allowRepeatedSwaps ?? true);
     const [heightDithering, setHeightDithering] = useState(persisted?.heightDithering ?? false);
     const [ditherLineWidth, setDitherLineWidth] = useState(persisted?.ditherLineWidth ?? 0.42);
 
@@ -106,7 +106,7 @@ export default function ThreeDControls({ swatches, imageDimensions, onChange, on
         persisted?.optimizerSeed
     );
     const [regionWeightingMode, setRegionWeightingMode] = useState<'uniform' | 'center' | 'edge'>(
-        persisted?.regionWeightingMode ?? 'uniform'
+        persisted?.regionWeightingMode ?? 'center'
     );
 
     const handleEnhancedColorMatchChange = useCallback((v: boolean) => {

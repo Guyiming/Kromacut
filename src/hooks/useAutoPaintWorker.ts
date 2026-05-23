@@ -18,6 +18,21 @@ import type {
     AutoPaintWorkerResponse,
 } from '../workers/autoPaint.worker';
 
+async function writeDebugLogsToFile(content: string): Promise<void> {
+    try {
+        const res = await fetch('/__write-debug-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+            body: content,
+        });
+        if (!res.ok) {
+            console.error('[autoPaintWorker] debug log write failed:', res.status, await res.text());
+        }
+    } catch (err) {
+        console.error('[autoPaintWorker] failed to write debug logs:', err);
+    }
+}
+
 export interface UseAutoPaintWorkerOptions {
     paintMode: 'manual' | 'autopaint';
     filaments: Filament[];
@@ -109,6 +124,10 @@ export function useAutoPaintWorker(
                     setAutoPaintResult(resp.result);
                 }
                 setIsComputing(false);
+
+                if (import.meta.env.DEV && resp.debugLogs && resp.debugLogs.length > 0) {
+                    void writeDebugLogsToFile(resp.debugLogs);
+                }
             };
             workerRef.current.onerror = (err) => {
                 console.error('[autoPaintWorker] worker error:', err);
