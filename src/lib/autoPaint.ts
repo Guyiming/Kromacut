@@ -1174,6 +1174,23 @@ function buildRepeatedSwapSequence(
 
     // 将图像颜色聚类成带权代表目标
     const imageTargets = clusterImageColors(imageSwatches, 32, 5.0);
+    {
+        debugLog('---->打印repeatimageTargets');
+        if (import.meta.env.DEV) {
+            const lines = [...imageTargets]
+                .sort((a, b) => {
+                    if (a.L !== b.L) return a.L - b.L;
+                    if (a.a !== b.a) return a.a - b.a;
+                    return a.b - b.b;
+                })
+                .map(
+                    (t) =>
+                        `---->L=${t.L.toFixed(6)}, a=${t.a.toFixed(6)}, b=${t.b.toFixed(6)}, weight=${t.weight.toFixed(6)}`
+                )
+                .join('\n');
+            debugLog(`---->imageTargets(swap) count=${imageTargets.length}\n${lines}`);
+        }
+    }
     if (imageTargets.length === 0) return [...baseFilaments];
 
     // 从基础序列开始
@@ -1421,6 +1438,123 @@ export function generateAutoLayers(
                 layerHeight,
                 firstLayerHeight
             );
+            {
+                debugLog('---->打印sortedFilaments');
+                if (import.meta.env.DEV) {
+                    const lines = sortedFilaments
+                        .map(
+                            (f, i) =>
+                                `---->[${i}] color=${f.color.toLowerCase()}, td=${f.td.toFixed(6)}`
+                        )
+                        .join('\n');
+                    debugLog(
+                        `---->sortedFilaments count=${sortedFilaments.length}\n${lines}`
+                    );
+                }
+            }
+            // {
+            //     // hack调试用：用 CPP 端 buildRepeatedSwapSequence 的输出覆盖 sortedFilaments，
+            //     // 便于在下游（calculateIdealHeight / compressZones / 层段生成）做 bit-by-bit 对齐。
+            //     // 数据来自 D:\CODE\HueRelief\HueRelief\Dist\logs\cpp.txt 的 "打印sortedFilaments" 段。
+            //     const cppSortedFilaments: Array<{ color: string; td: number }> = [
+            //         { color: '#00ae42', td: 2.0 },
+            //         { color: '#fce300', td: 6.0 },
+            //         { color: '#515a6c', td: 1.8 },
+            //         { color: '#e4bdd0', td: 3.0 },
+            //         { color: '#00358e', td: 4.0 },
+            //         { color: '#a6a9aa', td: 0.5 },
+            //         { color: '#61c680', td: 2.0 },
+            //         { color: '#6667ab', td: 2.0 },
+            //         { color: '#b28b33', td: 1.7 },
+            //         { color: '#ffffff', td: 3.5 },
+            //         { color: '#0069b1', td: 4.0 },
+            //         { color: '#d3b7a7', td: 2.0 },
+            //         { color: '#7d6556', td: 2.0 },
+            //         { color: '#1c254c', td: 1.0 },
+            //         { color: '#ff671f', td: 4.5 },
+            //         { color: '#9ea2a2', td: 3.0 },
+            //         { color: '#4c5f71', td: 3.0 },
+            //         { color: '#ffffff', td: 5.0 },
+            //         { color: '#c00d1e', td: 4.0 },
+            //         { color: '#9d432c', td: 2.0 },
+            //         { color: '#000e5b', td: 2.5 },
+            //         { color: '#de4343', td: 2.0 },
+            //         { color: '#ff6a13', td: 7.0 },
+            //         { color: '#b22f18', td: 3.0 },
+            //         { color: '#000000', td: 0.6 },
+            //         { color: '#9e007e', td: 2.5 },
+            //         { color: '#304301', td: 1.0 },
+            //         { color: '#0078bf', td: 0.5 },
+            //         { color: '#b7db57', td: 2.7 },
+            //         { color: '#053633', td: 1.5 },
+            //         { color: '#8bd5ee', td: 3.5 },
+            //         { color: '#8e9089', td: 2.0 },
+            //         { color: '#9b9ea0', td: 1.5 },
+            //         { color: '#ffffff', td: 3.5 },
+            //         { color: '#dde5ed', td: 10.0 },
+            //         { color: '#bb3d43', td: 1.5 },
+            //         { color: '#ffe17f', td: 4.0 },
+            //         { color: '#515a6c', td: 1.8 },
+            //         { color: '#f99963', td: 3.0 },
+            //         { color: '#009639', td: 1.7 },
+            //         { color: '#7d1112', td: 2.5 },
+            //         { color: '#606e81', td: 2.7 },
+            //         { color: '#ff5869', td: 8.0 },
+            //         { color: '#ae96d4', td: 2.0 },
+            //         { color: '#003b3b', td: 2.0 },
+            //         { color: '#000000', td: 0.6 },
+            //         { color: '#ffffff', td: 50.0 },
+            //         { color: '#f2eada', td: 8.0 },
+            //         { color: '#e7ceb5', td: 8.0 },
+            //         { color: '#000000', td: 0.6 },
+            //         { color: '#b22f18', td: 3.0 },
+            //         { color: '#fce300', td: 6.0 },
+            //         { color: '#304301', td: 1.0 },
+            //         { color: '#f2eada', td: 8.0 },
+            //     ];
+
+            //     // 在原始 inventory（filaments）中按 (color, td) 查找对应 Filament，保留其 id。
+            //     // 同一个 (color, td) 可能被 CPP 序列重复使用 —— 直接复用同一个 Filament 引用即可。
+            //     const overridden: Filament[] = [];
+            //     const missing: string[] = [];
+            //     for (const item of cppSortedFilaments) {
+            //         const match = filaments.find(
+            //             (f) =>
+            //                 f.color.toLowerCase() === item.color.toLowerCase() &&
+            //                 Math.abs(f.td - item.td) < 1e-6
+            //         );
+            //         if (match) {
+            //             overridden.push(match);
+            //         } else {
+            //             missing.push(`${item.color}/td=${item.td}`);
+            //         }
+            //     }
+
+            //     if (missing.length > 0) {
+            //         debugLog(
+            //             `---->[CPP-override] 警告：以下 ${missing.length} 项在 inventory 中未找到匹配，已跳过：${missing.join(', ')}`
+            //         );
+            //     }
+
+            //     debugLog(
+            //         `---->[CPP-override] 已用 CPP 端 sortedFilaments 覆盖 TS 端 (count=${overridden.length}/${cppSortedFilaments.length})`
+            //     );
+
+            //     sortedFilaments = overridden;
+
+            //     // 覆盖后再打印一次，方便在 tslog.txt 中确认替换生效
+            //     if (import.meta.env.DEV) {
+            //         const lines2 = sortedFilaments
+            //             .map(
+            //                 (f, i) =>
+            //                     `---->[${i}] color=${f.color.toLowerCase()}, td=${f.td.toFixed(6)}`
+            //             )
+            //             .join('\n');
+            //         debugLog(
+            //             `---->sortedFilaments(after CPP-override) count=${sortedFilaments.length}\n${lines2}`
+            //         );
+            //     }
+            // }
         }
     }
     else {
@@ -1454,6 +1588,7 @@ export function generateAutoLayers(
     // 没有硬编码的上限 —— 每个过渡区已被
     // 不透明度阈值（85%）和 DeltaE 收敛（< 2.3）所约束。
     const autoHeight = idealHeight;
+    maxHeight = 2.24;// 临时hack
     const targetMaxHeight = maxHeight ?? autoHeight;
     const { compressedZones, compressionRatio } = compressZones(zones, targetMaxHeight);
 
