@@ -947,6 +947,53 @@ function applyRegionWeightHeuristic(
 }
 
 /**
+ * 从 inventory 中按"代表性 deltaE"挑出 top-N 个最相关的耗材，作为 GA 的候选池。
+ *
+ * 评分逻辑（每个 filament 独立评分，无堆叠仿真）：
+ *   score(f) = sum over targets of ( deltaE(rgbToLab(hex(f.color)), target.lab) * target.weight )
+ * 分数越低 = 该 filament 单层颜色越能"覆盖"图像中的高权重 target。
+ *
+ * 与堆叠仿真打分的区别：堆叠是 GA 的职责，预筛选只看"颜色本身的代表性"，
+ * 这样：(1) CPP 端对齐路径短（只依赖 hexToRgb / rgbToLab / deltaELab）；
+ *       (2) 评分独立、可解释；(3) 比 N 次堆叠仿真快很多。
+ */
+function selectTopRelevantFilaments(
+    filaments: Filament[],
+    imageTargets: WeightedLab[],
+    topN: number
+): { selected: Filament[]; scored: Array<{ filament: Filament; score: number }> } {
+    if (filaments.length <= topN) {
+        return {
+            selected: [...filaments],
+            scored: filaments.map((f) => ({ filament: f, score: 0 })),
+        };
+    }
+    if (imageTargets.length === 0) {
+        return {
+            selected: filaments.slice(0, topN),
+            scored: filaments.map((f) => ({ filament: f, score: 0 })),
+        };
+    }
+
+    const scored = filaments.map((f) => {
+        const lab = rgbToLab(hexToRgb(f.color));
+        let score = 0;
+        for (const t of imageTargets) {
+            score += deltaELab(lab, t) * t.weight;
+        }
+        return { filament: f, score };
+    });
+
+    // 按 score 升序排序（越低越好）。同分时保持 inventory 原顺序（V8 sort 稳定）。
+    const sorted = [...scored].sort((a, b) => a.score - b.score);
+
+    return {
+        selected: sorted.slice(0, topN).map((s) => s.filament),
+        scored: sorted,
+    };
+}
+
+/**
  * 高级优化器路径：使用模拟退火 / 遗传算法
  */
 function findBestFilamentOrderWithOptimizer(
@@ -1013,16 +1060,41 @@ function findBestFilamentOrderWithOptimizer(
         regionWeights: optimizerOptions.regionWeights,
     };
 
-    // 应用前光 TD 缩放
-    const scaledFilaments = filaments.map((f) => ({
+    // --- 预筛选：从 inventory 中挑 top-N 最相关的耗材，再交给 GA ---
+    // 当 inventory 较大时，N! 搜索空间会让 GA 在有限代数内无法收敛；
+    // 先按"代表性 deltaE"筛到 topN（默认 20）个，把搜索空间降到 20! 以内。
+    const TOP_N = optimizerOptions.maxFilamentCount ?? 20;
+    const { selected: filteredFilaments, scored: prefilterScored } = selectTopRelevantFilaments(
+        filaments,
+        imageTargets,
+        TOP_N
+    );
+
+    {
+        debugLog('---->打印预筛选耗材');
+        if (import.meta.env.DEV) {
+            const lines = prefilterScored
+                .map(
+                    (s, i) =>
+                        `---->[${i}]${i < TOP_N ? '*' : ' '} color=${s.filament.color.toLowerCase()}, td=${s.filament.td.toFixed(6)}, score=${s.score.toFixed(6)}`
+                )
+                .join('\n');
+            debugLog(
+                `---->prefilter inventory=${filaments.length}, topN=${TOP_N}, selected=${filteredFilaments.length}\n${lines}`
+            );
+        }
+    }
+
+    // 应用前光 TD 缩放（基于筛选后的耗材）
+    const scaledFilaments = filteredFilaments.map((f) => ({
         ...f,
         td: f.td * FRONTLIT_TD_SCALE,
     }));
 
-    // 运行优化器
+    // 运行初次优化器
     const result = optimizeFilamentOrder(scaledFilaments, context, optimizerOptions);
     {
-        debugLog('---->打印优化器结果');
+        debugLog('---->打印初次结果');
         if (import.meta.env.DEV) {
             const orderLines = result.order
                 .map((f, i) => `---->[${i}] id=${f.id}, color=${f.color}, td=${f.td.toFixed(6)}`)
@@ -1038,7 +1110,8 @@ function findBestFilamentOrderWithOptimizer(
             );
         }
     }
-    // 映射回原始耗材（未缩放的 TD）
+    // 映射回原始耗材（未缩放的 TD）。注意：predictor 只筛了 TOP_N 个，
+    // 但反查仍在完整 filaments 里查 id —— 这样下游拿到的是带原始 TD 的 Filament 引用。
     const sortedFilaments = result.order.map((sf) =>
         filaments.find((f) => f.id === sf.id)
     ).filter((f): f is Filament => f !== undefined);
@@ -1439,7 +1512,7 @@ export function generateAutoLayers(
                 firstLayerHeight
             );
             {
-                debugLog('---->打印sortedFilaments');
+                debugLog('---->打印repeatedsortedFilaments');
                 if (import.meta.env.DEV) {
                     const lines = sortedFilaments
                         .map(

@@ -30,6 +30,7 @@ export interface OptimizerOptions
     eliteCount?: number; // 遗传算法中保留的精英个体数量
     regionWeights?: Float32Array; // 每像素重要性权重（0-1）
     cachingEnabled?: boolean; // 启用结果缓存
+    maxFilamentCount?: number; // 优化器之前预筛选的耗材数上限（默认 20）；仅声明，预筛选发生在 autoPaint.ts 入口
 }
 
 export interface OptimizerResult
